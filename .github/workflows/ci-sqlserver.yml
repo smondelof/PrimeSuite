@@ -1,0 +1,43 @@
+# TEMPORAL: comprobación de la migración a SQL Server (rama ci-sqlserver). Se borra con la rama.
+name: Comprobar SQL Server (temporal)
+
+on:
+  push:
+    branches: [ci-sqlserver]
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: 'Y'
+          MSSQL_SA_PASSWORD: 'Prime_Suite_CI_2026!'
+        ports: ['1433:1433']
+    env:
+      MSSQL_SA_PASSWORD: 'Prime_Suite_CI_2026!'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Comprobar
+        run: |
+          set +e
+          mkdir -p ci-out
+          node -v > ci-out/node.txt
+          cd prime-suite
+          npm ci --no-audit --no-fund > ../ci-out/npm-ci.txt 2>&1; echo "exit=$?" >> ../ci-out/npm-ci.txt
+          npm run typecheck > ../ci-out/typecheck.txt 2>&1; echo "exit=$?" >> ../ci-out/typecheck.txt
+          npm test > ../ci-out/test.txt 2>&1; echo "exit=$?" >> ../ci-out/test.txt
+          npm run build > ../ci-out/build.txt 2>&1; echo "exit=$?" >> ../ci-out/build.txt
+          node --import tsx ../ci/sqlserver-it.ts > ../ci-out/integracion.txt 2>&1; echo "exit=$?" >> ../ci-out/integracion.txt
+          cd ..
+          docker build -q prime-suite > ci-out/docker.txt 2>&1; echo "exit=$?" >> ci-out/docker.txt
+          git config user.name "ci" && git config user.email "ci@example.invalid"
+          git add ci-out && git commit -qm "Resultados de la comprobación" && git push -q origin HEAD:ci-sqlserver
