@@ -720,7 +720,7 @@ export function evalosRoutes(r: Router) {
     // Periodos en curso de todas sus personas (los nuevos se crean; los de quien ya estaba se recalculan).
     const periodSync = await convenioPeriods(driver, conv.code, c.user.email);
     await log(c, req, code ? 'evalos.convenio_updated' : 'evalos.convenio_created', conv.code,
-      `${conv.name} · vacaciones: ${conv.vacations.map((v) => `${v.type} ${v.days} d desde ${v.day}/${v.month}`).join(', ') || 'ninguna'} · ${conv.limits.length} límite(s) desde ${conv.incidenceDay}/${conv.incidenceMonth}` +
+      `${conv.name} · vacaciones: ${conv.vacations.map((v) => `${v.type} ${v.unit === 'H' ? `${Math.floor((v.minutes || 0) / 60)}:${String((v.minutes || 0) % 60).padStart(2, '0')} h` : `${v.days} d`} desde ${v.day}/${v.month}`).join(', ') || 'ninguna'} · ${conv.limits.length} límite(s) desde ${conv.incidenceDay}/${conv.incidenceMonth}` +
       (people && (people.added || people.removed) ? ` · personal: +${people.added} −${people.removed}` : '') +
       ` · periodos: ${periodSync.created} nuevos, ${periodSync.updated} actualizados`);
     return json({ ...(await driver.getConvenio(conv.code)), periodSync }, code ? 200 : 201);

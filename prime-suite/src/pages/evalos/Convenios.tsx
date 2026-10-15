@@ -126,7 +126,7 @@ export default function Convenios() {
                         {c.vacations.map((v, i) => (
                           <span key={i} className="small row" style={{ gap: 6 }} title={vacType.get(v.type)?.name || v.type}>
                             <TypeDot color={vacType.get(v.type)?.color} />
-                            <b className="mono">{v.type}</b> {fmtLimit('D', v.days)} <span className="xs muted">{rangeText(v.day, v.month, endOf(v, v.day, v.month))}</span>
+                            <b className="mono">{v.type}</b> {v.unit === 'H' ? fmtLimit('H', v.minutes || 0) : fmtLimit('D', v.days)} <span className="xs muted">{rangeText(v.day, v.month, endOf(v, v.day, v.month))}</span>
                           </span>
                         ))}
                       </div>
@@ -308,7 +308,15 @@ function NewVacationType({ info, onCreated, onCancel }: { info: EvalosVacationTy
 interface PlusRow { key: number; years: string; text: string }
 /** Límite de incidencia en edición: siempre en horas (HH:MM). fromDays = venía guardado en días. */
 interface LimitRow { key: number; incidence: string; text: string; pluses: PlusRow[]; fromDays?: number }
-interface VacRow extends End { key: number; type: string; day: number; month: number; text: string; pluses: PlusRow[] }
+/** Periodo de vacaciones en edición: en días (texto con decimales) o en horas (HH:MM). */
+interface VacRow extends End { key: number; type: string; day: number; month: number; unit: 'D' | 'H'; text: string; pluses: PlusRow[] }
+/** Pasa el valor de un periodo o plus a la otra unidad (a 8 h por día); vacío si no se puede leer. */
+function convertText(text: string, from: 'D' | 'H', to: 'D' | 'H') {
+  if (from === to || !text.trim()) return text;
+  if (to === 'H') { const d = parseDays(text); return d > 0 ? fmtHours(Math.round(d * HOURS_PER_DAY * 60)) : ''; }
+  const m = parseHours(text);
+  return m > 0 ? fmtDays(Math.max(0.5, Math.round((m / 60 / HOURS_PER_DAY) * 2) / 2)) : '';
+}
 const toPlusRows = (unit: 'D' | 'H', list?: { years: number; value: number }[]): PlusRow[] =>
   (list || []).map((p) => ({ key: ++rowSeq, years: String(p.years), text: unit === 'D' ? fmtDays(p.value) : fmtHours(p.value) }));
 const plusValue = (unit: 'D' | 'H', p: PlusRow) => ({ years: Number(p.years), value: unit === 'D' ? parseDays(p.text) : parseHours(p.text) });
@@ -336,7 +344,8 @@ function ConvenioModal({ convenio, incidences, vacationTypes, linkable, convenio
   const [code, setCode] = useState(convenio?.code || '');
   const [name, setName] = useState(convenio?.name || '');
   const [types, setTypes] = useState<EvalosVacationType[]>(vacationTypes.items);
-  const [vacRows, setVacRows] = useState<VacRow[]>(() => (convenio?.vacations || []).map((v) => ({ key: ++rowSeq, type: v.type, day: v.day, month: v.month, ...endOf(v, v.day, v.month), text: fmtDays(v.days), pluses: toPlusRows('D', v.pluses) })));
+  const [vacRows, setVacRows] = useState<VacRow[]>(() => (convenio?.vacations || []).map((v) => ({ key: ++rowSeq, type: v.type, day: v.day, month: v.month, ...endOf(v, v.day, v.month),
+    ...(v.unit === 'H' ? { unit: 'H' as const, text: fmtHours(v.minutes || 0), pluses: toPlusRows('H', v.pluses) } : { unit: 'D' as const, text: fmtDays(v.days), pluses: toPlusRows('D', v.pluses) }) })));
   // Filas con los pluses desplegados.
   const [openPlus, setOpenPlus] = useState<Set<number>>(new Set());
   const togglePlus = (key: number) => setOpenPlus((o) => { const n = new Set(o); if (n.has(key)) n.delete(key); else n.add(key); return n; });
@@ -371,12 +380,17 @@ function ConvenioModal({ convenio, incidences, vacationTypes, linkable, convenio
     const t = type || last?.type || types[0]?.code;
     if (!t) return;
     const day = last?.day ?? 1, month = last?.month ?? 1;
-    setVacRows((rs) => [...rs, { key: ++rowSeq, type: t, day, month, ...(last ? endOf(last, day, month) : defaultEnd(day, month)), text: '', pluses: [] }]);
+    setVacRows((rs) => [...rs, { key: ++rowSeq, type: t, day, month, ...(last ? endOf(last, day, month) : defaultEnd(day, month)), unit: last?.unit || 'D', text: '', pluses: [] }]);
   }
+  /** Cambia un periodo de días a horas o al revés, convirtiendo su valor y sus pluses a 8 h por día. */
+  const setVacUnit = (r: VacRow, unit: 'D' | 'H') => setVacRow(r.key, {
+    unit, text: convertText(r.text, r.unit, unit), pluses: r.pluses.map((p) => ({ ...p, text: convertText(p.text, r.unit, unit) }))
+  });
   function vacError(r: VacRow) {
     if (endError(r.day, r.month, r)) return endError(r.day, r.month, r);
-    if (r.pluses.some((p) => plusError('D', p, r.pluses))) return 'Revisa sus pluses';
-    if (!r.text.trim()) return 'Indica los días';
+    if (r.pluses.some((p) => plusError(r.unit, p, r.pluses))) return 'Revisa sus pluses';
+    if (!r.text.trim()) return r.unit === 'H' ? 'Indica las horas' : 'Indica los días';
+    if (r.unit === 'H') return parseHours(r.text) > 0 ? '' : 'Horas en formato HH:MM (p. ej. 16:00)';
     const n = parseDays(r.text);
     return !(n > 0 && n <= 365) ? 'De 0,5 a 365 días' : Number.isInteger(n * 2) ? '' : 'Solo medios días (p. ej. 22,5)';
   }
@@ -408,7 +422,8 @@ function ConvenioModal({ convenio, incidences, vacationTypes, linkable, convenio
     setBusy(true);
     const payload = {
       code, name,
-      vacations: vacRows.map((r) => ({ type: r.type, day: r.day, month: r.month, endDay: r.endDay, endMonth: r.endMonth, endNextYear: r.endNextYear, days: parseDays(r.text), pluses: r.pluses.map((p) => plusValue('D', p)) })),
+      vacations: vacRows.map((r) => ({ type: r.type, day: r.day, month: r.month, endDay: r.endDay, endMonth: r.endMonth, endNextYear: r.endNextYear,
+        ...(r.unit === 'H' ? { unit: 'H', days: 0, minutes: parseHours(r.text) } : { unit: 'D', days: parseDays(r.text) }), pluses: r.pluses.map((p) => plusValue(r.unit, p)) })),
       incidenceDay: inc.day, incidenceMonth: inc.month, incidenceEndDay: inc.endDay, incidenceEndMonth: inc.endMonth, incidenceEndNextYear: inc.endNextYear,
       limits: rows.map((r) => ({ incidence: r.incidence, unit: 'H', value: parseHours(r.text), pluses: r.pluses.map((p) => plusValue('H', p)) })),
       // Solo si se ha tocado la lista de personas (si no, el servidor no cambia EM_CONV).
@@ -431,7 +446,7 @@ function ConvenioModal({ convenio, incidences, vacationTypes, linkable, convenio
 
   const title = isNew ? 'Nuevo convenio' : `Convenio ${convenio!.code}${ro ? ' (consulta)' : ''}`;
   return (
-    <Modal title={title} onClose={onClose} width={1280}>
+    <Modal title={title} onClose={onClose} width={1320}>
       <form className="col" style={{ gap: 16 }} onSubmit={submit} noValidate>
         <div className="row wrap" style={{ gap: 12 }}>
           <label className="field" style={{ width: 160 }}>Código
@@ -460,7 +475,7 @@ function ConvenioModal({ convenio, incidences, vacationTypes, linkable, convenio
         {tab === 'vac' && (
         <div className="col" style={{ gap: 8 }}>
           <div className="row wrap" style={{ gap: 8 }}>
-            <span className="xs muted">Un periodo por fila: tipo de vacaciones, inicio, fin y días. El fin puede ser del año siguiente (p. ej. del 01/01 al 31/01 del año siguiente).</span>
+            <span className="xs muted">Un periodo por fila, en días o en horas. El fin puede ser del año siguiente (p. ej. del 01/01 al 31/01 del año siguiente).</span>
             <span className="grow" />
             {!ro && <button type="button" className="btn sm" onClick={() => setNewType((v) => !v)}><Icon.plus /> Nuevo tipo de vacaciones</button>}
             {!ro && (
@@ -478,7 +493,7 @@ function ConvenioModal({ convenio, incidences, vacationTypes, linkable, convenio
                   <th>Tipo de vacaciones</th>
                   <th>Inicio del periodo</th>
                   <th>Fin del periodo</th>
-                  <th>Días</th>
+                  <th>Cantidad</th>
                   <th>Pluses</th>
                   {!ro && <th style={{ width: 44 }} />}
                 </tr>
@@ -493,7 +508,7 @@ function ConvenioModal({ convenio, incidences, vacationTypes, linkable, convenio
                       <td>
                         <div className="row" style={{ gap: 8 }}>
                           <TypeDot color={info?.color} />
-                          <select className="select" style={{ minWidth: 250 }} aria-label="Tipo de vacaciones" title={info ? `${info.code} · ${info.name}` : r.type} value={r.type} disabled={ro} onChange={(e) => setVacRow(r.key, { type: e.target.value })}>
+                          <select className="select" style={{ minWidth: 244 }} aria-label="Tipo de vacaciones" title={info ? `${info.code} · ${info.name}` : r.type} value={r.type} disabled={ro} onChange={(e) => setVacRow(r.key, { type: e.target.value })}>
                             {!info && <option value={r.type}>{r.type} · (no existe en TIPOSVACACIONES)</option>}
                             {types.map((t) => <option key={t.code} value={t.code}>{t.code} · {t.name}</option>)}
                           </select>
@@ -506,16 +521,23 @@ function ConvenioModal({ convenio, incidences, vacationTypes, linkable, convenio
                         <div className="xs muted" style={{ marginTop: 4 }}>Actual: {periodText(r.day, r.month, r)}</div>
                       </td>
                       <td>
-                        <input className="input" style={{ width: 80 }} inputMode="decimal" value={r.text} disabled={ro} placeholder="22" aria-invalid={!!err}
-                          onChange={(e) => setVacRow(r.key, { text: e.target.value })} />
+                        <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+                          <input className="input" style={{ width: 66 }} inputMode={r.unit === 'D' ? 'decimal' : 'text'} value={r.text} disabled={ro} placeholder={r.unit === 'D' ? '22' : 'HH:MM'}
+                            aria-label={r.unit === 'D' ? `Días de ${r.type}` : `Horas de ${r.type}`} aria-invalid={!!err} onChange={(e) => setVacRow(r.key, { text: e.target.value })} />
+                          <select className="select" style={{ width: 90 }} aria-label={`Unidad del periodo de ${r.type}`} value={r.unit} disabled={ro}
+                            title="El periodo se genera en VACACIONES en días o en horas" onChange={(e) => setVacUnit(r, e.target.value === 'H' ? 'H' : 'D')}>
+                            <option value="D">días</option>
+                            <option value="H">horas</option>
+                          </select>
+                        </div>
                         {err && <div className="xs" style={{ color: 'var(--bad)' }}>{err}</div>}
                       </td>
-                      <td><PlusToggle unit="D" pluses={r.pluses} open={openPlus.has(r.key)} onToggle={() => togglePlus(r.key)} ro={ro} /></td>
+                      <td><PlusToggle unit={r.unit} pluses={r.pluses} open={openPlus.has(r.key)} onToggle={() => togglePlus(r.key)} ro={ro} /></td>
                       {!ro && <td><button type="button" className="icon-btn" aria-label={`Quitar ${r.type}`} onClick={() => setVacRows((rs) => rs.filter((x) => x.key !== r.key))}><Icon.trash /></button></td>}
                     </tr>
                     {openPlus.has(r.key) && (
                       <tr><td colSpan={ro ? 5 : 6} style={{ background: 'var(--surface-2)' }}>
-                        <PlusEditor unit="D" pluses={r.pluses} ro={ro} touched={touched} what={`del periodo de ${r.type}`} onChange={(pl) => setVacRow(r.key, { pluses: pl })} />
+                        <PlusEditor unit={r.unit} pluses={r.pluses} ro={ro} touched={touched} what={`del periodo de ${r.type}`} onChange={(pl) => setVacRow(r.key, { pluses: pl })} />
                       </td></tr>
                     )}
                     </Fragment>

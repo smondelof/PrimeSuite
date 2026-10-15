@@ -175,10 +175,10 @@ Si un dashboard solo tiene URL directa (sin UUID), se muestra en un iframe plano
   - Sección Workflow: rol (`EM_WORKFLOWROL`). Con rol, el perfil de Solicitudes lo asigna Perfiles Workflow y no se cambia a mano; al guardar (o al cambiar de departamento en su historial) se recalculan los perfiles.
 - **Calendarios**: calendarios laborales y festivos (nacional, autonómico, local, empresa). Hoy solo funciona con el motor de demostración; con SQL Server la pantalla avisa de que el mapeo a la BD real está pendiente.
 - **Convenios** (`server/evalos/convenios.ts`, `convperiods.ts`):
-  - **Periodos de vacaciones**: tantos como se quiera por convenio (tipo de `TIPOSVACACIONES`, día/mes de inicio y días). Desde la misma ventana se pueden crear tipos nuevos.
+  - **Periodos de vacaciones**: tantos como se quiera por convenio (tipo de `TIPOSVACACIONES`, día/mes de inicio y fin, y lo que corresponde **en días** —admite medios días— **o en horas**). Desde la misma ventana se pueden crear tipos nuevos.
   - **Periodo de incidencias**: día/mes de inicio y un límite **en horas** por cada incidencia de `INCIDENC`. Los límites guardados antiguamente en días se muestran pasados a horas, a 8 h por día, hasta que se vuelve a guardar el convenio.
-  - **Pluses por antigüedad** en cada periodo de vacaciones (días) y en cada límite (horas): a partir de N años, X más. Cada periodo tiene inicio y fin (día/mes, del mismo año o del siguiente; puede pasar del año, p. ej. del 01/01 al 31/01 del año siguiente; sin fin, un año menos un día).
-  - **Tablas propias** en la BD de Evalos 8: `PS_CONVENIOS`, `PS_CONVENIOS_VACACIONES`, `PS_CONVENIOS_LIMITES` y `PS_CONVENIOS_PLUSES`. Si falta alguna, la pantalla muestra el script para crearla.
+  - **Pluses por antigüedad** en cada periodo de vacaciones (en su unidad: días u horas) y en cada límite (horas): a partir de N años, X más. Cada periodo tiene inicio y fin (día/mes, del mismo año o del siguiente; puede pasar del año, p. ej. del 01/01 al 31/01 del año siguiente; sin fin, un año menos un día).
+  - **Tablas propias** en la BD de Evalos 8: `PS_CONVENIOS`, `PS_CONVENIOS_VACACIONES`, `PS_CONVENIOS_LIMITES` y `PS_CONVENIOS_PLUSES`. Si falta alguna tabla o columna (p. ej. `CA_UNID` y `CA_MINU` de los periodos en horas), se crea sola en la BD.
   - **Asignar personal** (`EM_CONV` de `PERSONAL`):
     - desde la ventana del convenio: buscar y añadir, añadir o quitar en bloque por empresa, departamento, sección o área, y quitar una a una; se aplica al guardar;
     - o desde la ficha de Personal.
@@ -186,7 +186,8 @@ Si un dashboard solo tiene URL directa (sin UUID), se muestra en un iframe plano
   - **Periodos por persona**: al entrar en un convenio (o al modificarlo) se crean o actualizan los de cada persona en alta en `VACACIONES` e `INCIDENCIALIMITE`.
     - Periodo en curso: el último que ha empezado (con su inicio y fin); si ya terminó, el siguiente. Si el alta cae dentro, empieza en la fecha de alta y se prorratea: vacaciones al medio día, límites al minuto.
     - Se suma el plus del tramo de antigüedad más alto alcanzado al inicio del periodo.
-    - `TOTALHORAS` = días × 8 h (provisional).
+    - Periodo en días: `PERIODOENDIAS` 1, `TOTALDIAS` con los días y `TOTALHORAS` = días × 8 h (provisional).
+    - Periodo en horas: `PERIODOENDIAS` 0, `TOTALDIAS` 0 y `TOTALHORAS` con las horas (con decimales: 16:30 h = 16,5). Se prorratea al minuto.
     - Una fila existente se actualiza sin tocar lo disfrutado; quitar a alguien del convenio no borra sus periodos.
     - *Generar periodos del año siguiente* crea los del periodo siguiente.
     - Se avisa, en el convenio y en la ficha, cuando lo disfrutado supera lo disponible.

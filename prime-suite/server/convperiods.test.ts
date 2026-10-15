@@ -53,7 +53,7 @@ const emp = (code: string, hireDate: string, active = true) => ({ code, hireDate
 
 test('filas de VACACIONES e INCIDENCIALIMITE de una persona (TOTALHORAS = días × 8)', () => {
   const r = rowsFor(CONV, emp('1', '2019-03-01'), () => '2026-10-09');
-  assert.deepEqual(r.vac, [{ employee: '1', type: 'V26', from: '2026-01-01', to: '2026-12-31', days: 22, hours: 176 }]);
+  assert.deepEqual(r.vac, [{ employee: '1', type: 'V26', from: '2026-01-01', to: '2026-12-31', unit: 'D', days: 22, hours: 176 }]);
   // 004: 40 h + 3 h de plus a los 4 años (lleva 7 años a 01/01/2026).
   assert.deepEqual(r.inc.map((x) => [x.incidence, x.unit, x.value]), [['001', 'H', 1200], ['004', 'H', 2580]]);
 });
@@ -171,4 +171,22 @@ test('periodos con fin propio: más de un año (se solapan) y de menos de un añ
   // Prorrateo sobre la duración real: 20 días en 13 meses (396 días), alta el 01/07/2026 → 20 × 215 / 396 = 10,9 → 11.
   const p = computePeriod({ ...trece, value: 20 }, '2026-07-01', '2026-10-14', 'D')!;
   assert.deepEqual([p.from, p.to, p.value], ['2026-07-01', '2027-01-31', 11]);
+});
+
+test('periodo de vacaciones en horas: TOTALHORAS en horas, plus en minutos y prorrateo al minuto', () => {
+  const conv: Convenio = { ...CONV, vacations: [{ type: 'AP', day: 1, month: 1, unit: 'H', days: 0, minutes: 16 * 60 + 30, pluses: [{ years: 5, value: 90 }] }], limits: [] };
+  // 7 años de antigüedad: 16:30 + 1:30 = 18 h.
+  assert.deepEqual(rowsFor(conv, emp('1', '2019-03-01'), () => '2026-10-09').vac,
+    [{ employee: '1', type: 'AP', from: '2026-01-01', to: '2026-12-31', unit: 'H', days: 0, hours: 18 }]);
+  // Alta el 02/07/2026 (183 de 365 días): 990 min × 183 / 365 = 496,4 → 496 min = 8,27 h.
+  assert.deepEqual(rowsFor(conv, emp('2', '2026-07-02'), () => '2026-10-09').vac,
+    [{ employee: '2', type: 'AP', from: '2026-07-02', to: '2026-12-31', unit: 'H', days: 0, hours: 8.27 }]);
+});
+
+test('avisos de exceso en periodos de vacaciones en horas', () => {
+  const a = excessAlerts(
+    [{ employee: '1', type: 'AP', from: '2026-01-01', to: '2026-12-31', unit: 'H', days: 0, hours: 16, assignedDays: 0, assignedHours: 16.5 },
+     { employee: '2', type: 'AP', from: '2026-01-01', to: '2026-12-31', unit: 'H', days: 0, hours: 16, assignedDays: 1, assignedHours: 8 }], [], '2026-10-09');
+  assert.equal(a.length, 1);
+  assert.match(a[0].text, /16:30 h asignadas y solo le corresponden 16:00 h/);
 });

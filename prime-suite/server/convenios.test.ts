@@ -21,8 +21,8 @@ test('normaliza el convenio: código en mayúsculas, nombre limpio y límites or
   assert.deepEqual(c.limits[1], { incidence: '003', unit: 'H', value: 1230, pluses: [] });
   // Sin fin: un año menos un día (01/04 → 31/03 del año siguiente; 01/01 → 31/12).
   assert.deepEqual(c.vacations, [
-    { type: 'V26', day: 1, month: 4, endDay: 31, endMonth: 3, endNextYear: true, days: 23, pluses: [] },
-    { type: 'AP', day: 1, month: 1, endDay: 31, endMonth: 12, endNextYear: false, days: 2.5, pluses: [] }
+    { type: 'V26', day: 1, month: 4, endDay: 31, endMonth: 3, endNextYear: true, unit: 'D', days: 23, pluses: [] },
+    { type: 'AP', day: 1, month: 1, endDay: 31, endMonth: 12, endNextYear: false, unit: 'D', days: 2.5, pluses: [] }
   ]);
   assert.deepEqual([c.incidenceEndDay, c.incidenceEndMonth, c.incidenceEndNextYear], [31, 8, true]);
   // Varios periodos del mismo tipo, con inicios distintos.
@@ -142,4 +142,19 @@ test('fin del periodo: mismo año posterior al inicio, o del año siguiente (tam
   rejects({ ...base, vacations: [{ type: 'V26', day: 1, month: 6, endDay: 31, endMonth: 5, endNextYear: false, days: 22 }] }, /anterior o igual a su inicio/);
   rejects({ ...base, vacations: [{ type: 'V26', day: 1, month: 6, endDay: 31, endMonth: 6, days: 22 }] }, /fin del periodo de V26 no es una fecha/);
   rejects({ ...base, incidenceEndDay: 29, incidenceEndMonth: 2, incidenceEndNextYear: true }, /fin del periodo de incidencias/);
+});
+
+test('periodos de vacaciones en horas: valor y pluses en minutos', () => {
+  const c = sanitizeConvenio({ ...base, vacations: [{ type: 'AP', day: 1, month: 1, unit: 'H', minutes: 990, days: 3, pluses: [{ years: 5, value: 120 }] }] }, opts);
+  assert.deepEqual(c.vacations[0], { type: 'AP', day: 1, month: 1, endDay: 31, endMonth: 12, endNextYear: false, unit: 'H', days: 0, minutes: 990, pluses: [{ years: 5, value: 120 }] });
+  assert.throws(() => sanitizeConvenio({ ...base, vacations: [{ type: 'AP', day: 1, month: 1, unit: 'H', minutes: 0 }] }, opts), /mayor que 00:00/);
+  assert.throws(() => sanitizeConvenio({ ...base, vacations: [{ type: 'AP', day: 1, month: 1, unit: 'H', minutes: 12.5 }] }, opts), /mayor que 00:00/);
+  assert.throws(() => sanitizeConvenio({ ...base, vacations: [{ type: 'AP', day: 1, month: 1, unit: 'H', minutes: 60, pluses: [{ years: 2, value: 0.5 }] }] }, opts), /00:00/);
+});
+
+test('el script añade las columnas de periodos en horas y deja CA_DIAS opcional', () => {
+  const sql = conveniosSql('evalos');
+  assert.match(sql, /COL_LENGTH\(N'\[evalos\]\.\[PS_CONVENIOS_VACACIONES\]', N'CA_UNID'\) IS NULL[\s\S]*ADD CA_UNID char\(1\) NULL, CA_MINU int NULL/);
+  assert.match(sql, /DROP CONSTRAINT CK_PS_CONVENIOS_VACACIONES_DIAS[\s\S]*ALTER COLUMN CA_DIAS decimal\(5, 1\) NULL[\s\S]*CK_PS_CONVENIOS_VACACIONES_VALOR/);
+  assert.match(conveniosSql("o'x"), /OBJECT_ID\(N''\[o''''x\]\.\[PS_CONVENIOS_VACACIONES\]''\)/);
 });
