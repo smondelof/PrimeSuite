@@ -779,16 +779,19 @@ test('SQL Server: asignar y quitar el convenio a varios empleados (EM_CONV)', as
 
 test('SQL Server: al guardar un convenio se escriben sus periodos, límites y pluses', async () => {
   const c4 = (n: string) => [col(n, 'nvarchar', 10, false)];
-  TABLES.PS_CONVENIOS = [...c4('CV_CODI'), col('CV_IFDI', 'tinyint', null)]; TABLES.PS_CONVENIOS_VACACIONES = [...c4('CA_CONV'), col('CA_LINE', 'smallint', null, false), col('CA_FDIA', 'tinyint', null)];
+  TABLES.PS_CONVENIOS = [...c4('CV_CODI'), col('CV_IFDI', 'tinyint', null)]; TABLES.PS_CONVENIOS_VACACIONES = [...c4('CA_CONV'), col('CA_LINE', 'smallint', null, false), col('CA_FDIA', 'tinyint', null), col('CA_UNID', 'char', 1)];
   TABLES.PS_CONVENIOS_LIMITES = c4('CL_CONV'); TABLES.PS_CONVENIOS_PLUSES = c4('CP_CONV');
   const { drv, calls } = fakeSql((text) => (text.includes('COUNT(*)') ? { rows: [{ n: 0 }] } : { rows: [] }));
   await drv.saveConvenio({
     code: 'METAL', name: 'METAL', incidenceDay: 1, incidenceMonth: 1,
-    vacations: [{ type: 'V26', day: 1, month: 1, days: 22, pluses: [{ years: 5, value: 1 }, { years: 6, value: 2 }] }],
+    vacations: [{ type: 'V26', day: 1, month: 1, days: 22, pluses: [{ years: 5, value: 1 }, { years: 6, value: 2 }] },
+      { type: 'AP', day: 1, month: 1, unit: 'H', days: 0, minutes: 960, pluses: [{ years: 3, value: 120 }] }],
     limits: [{ incidence: '003', unit: 'H', value: 600, pluses: [{ years: 4, value: 180 }] }]
   }, true, { date: '20261009', time: '1300', user: 'SMO' });
+  const vac = calls.filter((c) => c.text.startsWith('INSERT INTO [PS_CONVENIOS_VACACIONES]')).map((c) => c.params);
+  assert.deepEqual(vac.map((p) => [p.line, p.tvac, p.unit, p.dias, p.minu]), [[1, 'V26', 'D', 22, null], [2, 'AP', 'H', null, 960]]);
   const plus = calls.filter((c) => c.text.startsWith('INSERT INTO [PS_CONVENIOS_PLUSES]')).map((c) => c.params);
-  assert.deepEqual(plus.map((p) => [p.tipo, p.ref, p.anos, p.dias, p.minu]), [['V', '1', 5, 1, null], ['V', '1', 6, 2, null], ['I', '003', 4, null, 180]]);
+  assert.deepEqual(plus.map((p) => [p.tipo, p.ref, p.anos, p.dias, p.minu]), [['V', '1', 5, 1, null], ['V', '1', 6, 2, null], ['V', '2', 3, null, 120], ['I', '003', 4, null, 180]]);
   for (const t of ['PS_CONVENIOS', 'PS_CONVENIOS_VACACIONES', 'PS_CONVENIOS_LIMITES', 'PS_CONVENIOS_PLUSES']) delete TABLES[t];
 });
 
@@ -811,6 +814,14 @@ test('SQL Server: periodos de VACACIONES (alta con valores fijos; actualización
   await drv.upsertVacationPeriods([{ ...row, days: 20 }], stamp);
   const up = calls.find((c) => c.text.startsWith('UPDATE [VACACIONES]'))!;
   assert.ok(up && !/DIASASIGNADOS/.test(up.text) && /\[TOTALDIAS\] = @p\d/.test(up.text));
+  // Periodo en horas: PERIODOENDIAS 0, TOTALDIAS 0 y TOTALHORAS con las horas.
+  exists = 0; calls.length = 0;
+  await drv.upsertVacationPeriods([{ ...row, type: 'AP', unit: 'H', days: 0, hours: 16.5 }], stamp);
+  const ih = calls.find((c) => c.text.startsWith('INSERT INTO [VACACIONES]'))!;
+  const mh = ih.text.match(/VALUES \(([^)]*)\)/)![1].split(', ').map((x) => x.slice(1));
+  const ch = ih.text.match(/\(([^)]*)\) VALUES/)![1].split(', ').map((x) => x.replace(/[[\]]/g, ''));
+  const vh = (c: string) => ih.params[mh[ch.indexOf(c)]];
+  assert.deepEqual([vh('TOTALDIAS'), vh('PERIODOENDIAS'), vh('TOTALHORAS'), vh('HORASASIGNADAS')], [0, 0, 16.5, 0]);
   delete TABLES.VACACIONES;
 });
 
@@ -829,7 +840,7 @@ test('SQL Server: periodos de INCIDENCIALIMITE (límite en minutos y PERIODOENDI
 
 test('SQL Server: los límites guardados en días se leen en horas (8 h por día) y se guardan en minutos', async () => {
   const c4 = (n: string) => [col(n, 'nvarchar', 10, false)];
-  TABLES.PS_CONVENIOS = [...c4('CV_CODI'), col('CV_IFDI', 'tinyint', null)]; TABLES.PS_CONVENIOS_VACACIONES = [...c4('CA_CONV'), col('CA_LINE', 'smallint', null, false), col('CA_FDIA', 'tinyint', null)];
+  TABLES.PS_CONVENIOS = [...c4('CV_CODI'), col('CV_IFDI', 'tinyint', null)]; TABLES.PS_CONVENIOS_VACACIONES = [...c4('CA_CONV'), col('CA_LINE', 'smallint', null, false), col('CA_FDIA', 'tinyint', null), col('CA_UNID', 'char', 1)];
   TABLES.PS_CONVENIOS_LIMITES = c4('CL_CONV'); TABLES.PS_CONVENIOS_PLUSES = c4('CP_CONV');
   const { drv, calls } = fakeSql((text) => {
     if (text.includes('FROM [PS_CONVENIOS] ORDER BY')) return { rows: [{ code: 'METAL', name: 'METAL', id: 1, im: 1 }] };

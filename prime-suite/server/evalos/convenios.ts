@@ -1,6 +1,7 @@
 // Atajos de Evalos · Convenios.
 // Un convenio predefine, para el personal al que se asigne:
-//  - tantos periodos de vacaciones como se quiera: tipo (TIPOSVACACIONES), inicio (día/mes) y días del periodo;
+//  - tantos periodos de vacaciones como se quiera: tipo (TIPOSVACACIONES), inicio y fin (día/mes) y lo que
+//    corresponde en el periodo, en días (admite medios días) o en horas;
 //  - el inicio (día/mes) del periodo de incidencias y, por cada incidencia de INCIDENC, su límite en horas
 //    (los límites antiguos guardados en días se leen pasados a horas, a 8 h por día).
 // Cada periodo dura un año desde su día/mes de inicio (p. ej. 01/04 → del 01/04 al 31/03 del año siguiente).
@@ -22,6 +23,7 @@ export const MAX_PLUS_YEARS = 60;
 export const CONVENIO_CODE_MAX = 10;
 export const CONVENIO_NAME_MAX = 60;
 export const MAX_VACATION_DAYS = 365;
+export const MAX_VACATION_MINUTES = 8784 * 60; // un año bisiesto entero
 export const MAX_LIMIT_DAYS = 366;
 export const MAX_LIMIT_MINUTES = 8784 * 60; // un año bisiesto entero
 export const MAX_LIMITS = 200;
@@ -82,7 +84,7 @@ export const LIMIT_HOURS_PER_DAY = 8;
 
 /**
  * Valida y normaliza un convenio recibido de la interfaz.
- * Las vacaciones van en días (admiten medios días); los límites de incidencia, siempre en horas (minutos).
+ * Las vacaciones van en días (admiten medios días) o en horas (minutos); los límites de incidencia, siempre en horas.
  */
 export function sanitizeConvenio(b: any, opts: { uppercase: boolean; incidences?: Set<string>; vacationTypes?: Set<string> }): Convenio {
   const code = String(b?.code ?? '').trim();
@@ -108,10 +110,19 @@ export function sanitizeConvenio(b: any, opts: { uppercase: boolean; incidences?
     const key = `${type}|${day}|${month}`;
     if (seenVac.has(key)) throw new HttpError(400, `El periodo de ${type} que empieza el ${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')} está repetido`);
     seenVac.add(key);
+    const end = sanitizeEnd(v, ['endDay', 'endMonth', 'endNextYear'], day, month, `del periodo de ${type}`);
+    // Periodo en días (admite medios días) o en horas (el valor llega en minutos).
+    const unit: 'D' | 'H' = String(v?.unit ?? 'D').toUpperCase() === 'H' ? 'H' : 'D';
+    if (unit === 'H') {
+      const minutes = num(v?.minutes);
+      if (!Number.isInteger(minutes) || minutes <= 0 || minutes > MAX_VACATION_MINUTES)
+        throw new HttpError(400, `Las horas de vacaciones de ${type} deben ser una cantidad mayor que 00:00`);
+      return { type, day, month, ...end, unit, days: 0, minutes, pluses: sanitizePluses(v?.pluses, 'H', `el periodo de ${type}`) };
+    }
     const days = num(v?.days);
     if (!Number.isFinite(days) || days <= 0 || days > MAX_VACATION_DAYS || !halfDays(days))
       throw new HttpError(400, `Los días de vacaciones de ${type} deben ser de 0,5 a ${MAX_VACATION_DAYS} (admite medios días)`);
-    return { type, day, month, ...sanitizeEnd(v, ['endDay', 'endMonth', 'endNextYear'], day, month, `del periodo de ${type}`), days, pluses: sanitizePluses(v?.pluses, 'D', `el periodo de ${type}`) };
+    return { type, day, month, ...end, unit, days, pluses: sanitizePluses(v?.pluses, 'D', `el periodo de ${type}`) };
   });
 
   const incidenceDay = num(b?.incidenceDay), incidenceMonth = num(b?.incidenceMonth);
@@ -159,7 +170,9 @@ export function conveniosSql(schema = 'dbo') {
 --   CA_VDIA / CA_VMES  día y mes de inicio del periodo
 --   CA_FDIA / CA_FMES / CA_FANO  día y mes de fin del periodo; CA_FANO 1 = del año siguiente
 --                      (sin valor: un año menos un día)
---   CA_DIAS  días de vacaciones del periodo (admite medios días)
+--   CA_UNID  D = periodo en días, H = periodo en horas (sin valor: en días)
+--   CA_DIAS  días de vacaciones del periodo (admite medios días; solo en días)
+--   CA_MINU  horas de vacaciones del periodo, en minutos (8:30 h = 510; solo en horas)
 --
 -- ${LIMITES_TABLE}: límites de incidencia de cada convenio (una fila por incidencia).
 --   CL_CONV  código del convenio (${CONVENIOS_TABLE}.CV_CODI; se borra con el convenio)
@@ -173,8 +186,8 @@ export function conveniosSql(schema = 'dbo') {
 --   CP_TIPO  V = de un periodo de vacaciones, I = de un límite de incidencia
 --   CP_REF   V: número del periodo (${VACACIONES_TABLE}.CA_LINE); I: código de la incidencia (CL_INCI)
 --   CP_ANOS  años de antigüedad a partir de los que se aplica
---   CP_DIAS  días más (vacaciones; admite medios días)
---   CP_MINU  minutos más (límites de incidencia)
+--   CP_DIAS  días más (periodos de vacaciones en días; admite medios días)
+--   CP_MINU  minutos más (periodos de vacaciones en horas y límites de incidencia)
 
 IF OBJECT_ID(N'${s}.[${CONVENIOS_TABLE}]', N'U') IS NULL
 BEGIN
@@ -213,6 +226,18 @@ END;
 
 IF COL_LENGTH(N'${s}.[${VACACIONES_TABLE}]', N'CA_FDIA') IS NULL
   ALTER TABLE ${s}.[${VACACIONES_TABLE}] ADD CA_FDIA tinyint NULL, CA_FMES tinyint NULL, CA_FANO bit NULL;
+
+-- Periodos de vacaciones en horas (versiones anteriores: solo en días). CA_DIAS pasa a admitir NULL.
+IF COL_LENGTH(N'${s}.[${VACACIONES_TABLE}]', N'CA_UNID') IS NULL
+BEGIN
+  ALTER TABLE ${s}.[${VACACIONES_TABLE}] ADD CA_UNID char(1) NULL, CA_MINU int NULL;
+  EXEC (N'IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N''CK_PS_CONVENIOS_VACACIONES_DIAS'' AND parent_object_id = OBJECT_ID(N''${q(q(s))}.[${VACACIONES_TABLE}]''))
+      ALTER TABLE ${q(s)}.[${VACACIONES_TABLE}] DROP CONSTRAINT CK_PS_CONVENIOS_VACACIONES_DIAS;
+    ALTER TABLE ${q(s)}.[${VACACIONES_TABLE}] ALTER COLUMN CA_DIAS decimal(5, 1) NULL;
+    ALTER TABLE ${q(s)}.[${VACACIONES_TABLE}] ADD CONSTRAINT CK_PS_CONVENIOS_VACACIONES_VALOR CHECK (
+      (ISNULL(CA_UNID, ''D'') = ''D'' AND CA_DIAS > 0 AND CA_DIAS <= ${MAX_VACATION_DAYS} AND CA_MINU IS NULL) OR
+      (CA_UNID = ''H'' AND CA_MINU > 0 AND CA_DIAS IS NULL));');
+END;
 
 -- Tabla creada con una versión anterior del script (un solo periodo por tipo): se numeran los periodos.
 IF COL_LENGTH(N'${s}.[${VACACIONES_TABLE}]', N'CA_LINE') IS NULL

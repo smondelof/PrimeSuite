@@ -128,8 +128,12 @@ export interface ConvenioPlus { years: number; value: number }
  * fromDays: el límite estaba guardado en días (versión anterior) y se ha pasado a horas a 8 h por día.
  */
 export interface ConvenioLimit { incidence: string; unit: 'H'; value: number; pluses?: ConvenioPlus[]; fromDays?: number }
-/** Periodo de VACACIONES de una persona. Fechas AAAA-MM-DD; horas = TOTALHORAS (días × horas por día). */
-export interface VacationPeriodRow { employee: string; type: string; from: string; to: string; days: number; hours: number; prevFrom?: string }
+/**
+ * Periodo de VACACIONES de una persona. Fechas AAAA-MM-DD.
+ * unit D (o sin unit) = periodo en días (PERIODOENDIAS 1): days = TOTALDIAS y hours = TOTALHORAS (días × horas por día).
+ * unit H = periodo en horas (PERIODOENDIAS 0): days = 0 y hours = TOTALHORAS (horas con decimales).
+ */
+export interface VacationPeriodRow { employee: string; type: string; from: string; to: string; unit?: 'D' | 'H'; days: number; hours: number; prevFrom?: string }
 /** Periodo de INCIDENCIALIMITE de una persona: límite en días (unit D) o minutos (unit H). */
 export interface IncidenceLimitRow { employee: string; incidence: string; from: string; to: string; unit: 'D' | 'H'; value: number; prevFrom?: string }
 /** Clave de un periodo grabado (persona + tipo de vacaciones o incidencia + FECHAINICIO). */
@@ -152,7 +156,11 @@ export interface VacationTypeCreated { type: VacationType; row: Record<string, u
 /** Periodo de vacaciones de un tipo (TIPOSVACACIONES): un año desde su día/mes de inicio. */
 /** Fin del periodo: día/mes, del mismo año del inicio o del siguiente (endNextYear). */
 export interface PeriodEnd { endDay: number; endMonth: number; endNextYear: boolean }
-export interface ConvenioVacation extends Partial<PeriodEnd> { type: string; day: number; month: number; days: number; pluses?: ConvenioPlus[] }
+/**
+ * Periodo de vacaciones de un convenio. unit D (o sin unit) = en días: days (admite medios días) y pluses en días.
+ * unit H = en horas: minutes (8:30 h = 510), days = 0 y pluses en minutos.
+ */
+export interface ConvenioVacation extends Partial<PeriodEnd> { type: string; day: number; month: number; unit?: 'D' | 'H'; days: number; minutes?: number; pluses?: ConvenioPlus[] }
 export interface Convenio {
   code: string;
   name: string;

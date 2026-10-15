@@ -193,7 +193,8 @@ export interface EvalosConvenioPlus { years: number; value: number }
 export interface EvalosConvenioLimit { incidence: string; unit: 'H'; value: number; pluses?: EvalosConvenioPlus[]; fromDays?: number }
 /** Periodo de vacaciones de un tipo de TIPOSVACACIONES. */
 /** Fin del periodo: endDay/endMonth, del año siguiente si endNextYear (sin fin: un año menos un día). */
-export interface EvalosConvenioVacation { type: string; day: number; month: number; endDay?: number; endMonth?: number; endNextYear?: boolean; days: number; pluses?: EvalosConvenioPlus[] }
+/** Periodo de vacaciones del convenio: en días (days, medios días) o en horas (unit H, minutes; days = 0). Pluses en la misma unidad. */
+export interface EvalosConvenioVacation { type: string; day: number; month: number; endDay?: number; endMonth?: number; endNextYear?: boolean; unit?: 'D' | 'H'; days: number; minutes?: number; pluses?: EvalosConvenioPlus[] }
 export interface EvalosConvenio {
   code: string; name: string;
   /** Personas con este convenio (EM_CONV) y, de ellas, en alta. */

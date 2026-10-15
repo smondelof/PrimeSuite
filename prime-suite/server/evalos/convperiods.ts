@@ -4,6 +4,8 @@
 //  - Periodo: un año desde el día/mes de inicio de la línea del convenio; la fecha fin es el día anterior.
 //  - Se genera el periodo en curso (o el primero, si la fecha de alta es futura). Los del año siguiente se crean
 //    con el botón «Generar periodos del año siguiente»; al recalcular, los siguientes solo se actualizan si ya existen.
+//  - Periodos de vacaciones en días (PERIODOENDIAS 1, TOTALDIAS y TOTALHORAS) o en horas (PERIODOENDIAS 0, solo
+//    TOTALHORAS); los límites de incidencia, siempre en horas (LIMITE en minutos).
 //  - Primer periodo: si el alta cae dentro, empieza en la fecha de alta y el total se prorratea por los días que
 //    quedan (días: al medio día más cercano; horas: al minuto).
 //  - Antigüedad: años cumplidos al inicio del periodo; se aplica el plus del tramo más alto alcanzado.
@@ -104,8 +106,12 @@ export const nextRef = (line: PeriodLine, ref: string) => periodOfYear(line, lin
 export function rowsFor(conv: Convenio, emp: Pick<Personal, 'code' | 'hireDate'>, refOf: (line: PeriodLine) => string) {
   const vac: VacationPeriodRow[] = [];
   for (const v of conv.vacations) {
-    const p = computePeriod({ day: v.day, month: v.month, endDay: v.endDay, endMonth: v.endMonth, endNextYear: v.endNextYear, value: v.days, pluses: v.pluses }, emp.hireDate, refOf(v), 'D');
-    if (p) vac.push({ employee: emp.code, type: v.type, from: p.from, to: p.to, days: p.value, hours: Math.round(p.value * HOURS_PER_DAY * 100) / 100 });
+    // En días: TOTALDIAS y TOTALHORAS (días × horas por día). En horas: solo TOTALHORAS (minutos → horas con decimales).
+    const unit: 'D' | 'H' = v.unit === 'H' ? 'H' : 'D';
+    const p = computePeriod({ day: v.day, month: v.month, endDay: v.endDay, endMonth: v.endMonth, endNextYear: v.endNextYear, value: unit === 'H' ? v.minutes || 0 : v.days, pluses: v.pluses }, emp.hireDate, refOf(v), unit);
+    if (!p) continue;
+    if (unit === 'H') vac.push({ employee: emp.code, type: v.type, from: p.from, to: p.to, unit, days: 0, hours: Math.round((p.value / 60) * 100) / 100 });
+    else vac.push({ employee: emp.code, type: v.type, from: p.from, to: p.to, unit, days: p.value, hours: Math.round(p.value * HOURS_PER_DAY * 100) / 100 });
   }
   const inc: IncidenceLimitRow[] = [];
   const incLine: PeriodLine = { day: conv.incidenceDay, month: conv.incidenceMonth, endDay: conv.incidenceEndDay, endMonth: conv.incidenceEndMonth, endNextYear: conv.incidenceEndNextYear };
@@ -118,6 +124,7 @@ export function rowsFor(conv: Convenio, emp: Pick<Personal, 'code' | 'hireDate'>
 
 const fmt = (d: string) => d.split('-').reverse().join('/');
 const fmtNum = (n: number) => n.toLocaleString('es-ES', { maximumFractionDigits: 2 });
+const fmtHours = (h: number) => fmtMin(Math.round(h * 60));
 const fmtMin = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
 /** Avisos de periodos vigentes (que acaban hoy o después) con más disfrutado que disponible. */
@@ -125,6 +132,10 @@ export function excessAlerts(vac: StoredVacationPeriod[], inc: StoredIncidenceLi
   const out: PeriodAlert[] = [];
   for (const v of vac) {
     if (v.to < today) continue;
+    if (v.unit === 'H') {
+      if (v.assignedHours > v.hours) out.push({ employee: v.employee, text: `Vacaciones ${v.type} (${fmt(v.from)}–${fmt(v.to)}): tiene ${fmtHours(v.assignedHours)} h asignadas y solo le corresponden ${fmtHours(v.hours)} h.` });
+      continue;
+    }
     if (v.assignedDays > v.days) out.push({ employee: v.employee, text: `Vacaciones ${v.type} (${fmt(v.from)}–${fmt(v.to)}): tiene ${fmtNum(v.assignedDays)} días asignados y solo le corresponden ${fmtNum(v.days)}.` });
     else if (v.hours > 0 && v.assignedHours > v.hours) out.push({ employee: v.employee, text: `Vacaciones ${v.type} (${fmt(v.from)}–${fmt(v.to)}): tiene ${fmtNum(v.assignedHours)} horas asignadas y solo le corresponden ${fmtNum(v.hours)}.` });
   }
@@ -191,7 +202,7 @@ export async function syncPeriods(driver: EvalosDriver, conv: Convenio, employee
     const gone = (x: { employee: string; to: string }) => x.to < hireChange.to && codes.includes(x.employee);
     const vGone = existing.vacations.filter(gone), iGone = existing.limits.filter(gone);
     const vDel = vGone.filter((v) => !v.assignedDays && !v.assignedHours), iDel = iGone.filter((l) => !l.used);
-    for (const v of vGone.filter((x) => !vDel.includes(x))) alerts.push({ employee: v.employee, text: `El periodo de vacaciones ${v.type} (${fmt(v.from)}–${fmt(v.to)}) es anterior a la nueva fecha de alta, pero tiene ${fmtNum(v.assignedDays)} días asignados: no se ha borrado. Revísalo en Evalos.` });
+    for (const v of vGone.filter((x) => !vDel.includes(x))) alerts.push({ employee: v.employee, text: `El periodo de vacaciones ${v.type} (${fmt(v.from)}–${fmt(v.to)}) es anterior a la nueva fecha de alta, pero tiene ${v.unit === 'H' ? `${fmtHours(v.assignedHours)} h asignadas` : `${fmtNum(v.assignedDays)} días asignados`}: no se ha borrado. Revísalo en Evalos.` });
     for (const l of iGone.filter((x) => !iDel.includes(x))) alerts.push({ employee: l.employee, text: `El límite de la incidencia ${l.incidence} (${fmt(l.from)}–${fmt(l.to)}) es anterior a la nueva fecha de alta, pero ya tiene uso: no se ha borrado. Revísalo en Evalos.` });
     try {
       if (vDel.length) deleted += await pd.deletePeriods('vacations', vDel.map((v) => ({ employee: v.employee, code: v.type, from: v.from })));
