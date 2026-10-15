@@ -203,11 +203,15 @@ async function openPool(c: Conn): Promise<{ pool: import('mssql').ConnectionPool
   try {
     const pool = await new sql.ConnectionPool(poolConfig(c)).connect();
     return { pool, createdDatabase: false };
-  } catch (e) {
-    if (!isMissingDatabase(e)) throw e;
+  } catch (e: any) {
+    // Si la base de datos no existe, SQL Server suele responder solo «Login failed» (como con una
+    // contraseña mala). Para distinguirlo se prueba el mismo usuario contra master.
+    const loginProblem = isMissingDatabase(e) || e?.code === 'ELOGIN' || errNumber(e) === 18456 || /Login failed/i.test(String(e?.message));
+    if (!loginProblem || c.database.toLowerCase() === 'master') throw e;
   }
-  // La base de datos no existe (o el usuario no puede abrirla): se intenta crear desde master.
+  // Si tampoco entra en master, el error (usuario/contraseña incorrectos…) sale tal cual.
   const master = await new sql.ConnectionPool(poolConfig(c, 'master')).connect();
+  // Credenciales correctas: el problema es la base de datos. Si no existe, se crea.
   try {
     const exists = await master.request().input('n', sql.NVarChar(128), c.database).query('SELECT DB_ID(@n) AS id');
     if (exists.recordset[0]?.id != null) throw new Error(`No se puede abrir la base de datos "${c.database}" con el usuario "${c.user}". Dale acceso (p. ej. db_owner) a ese usuario.`);
