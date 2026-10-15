@@ -1,7 +1,7 @@
 // Restaurar/importar una copia de seguridad en el almacén actual.
 // Uso (dentro del contenedor):  node --import tsx server/tools/restore.ts /data/backup.json
 import { readFile } from 'node:fs/promises';
-import { store } from '../store.ts';
+import { store, storeMode } from '../store.ts';
 
 const file = process.argv[2];
 if (!file) { console.error('Indica el fichero de copia: node --import tsx server/tools/restore.ts <fichero.json>'); process.exit(1); }
@@ -10,4 +10,5 @@ if (parsed.format !== 'prime-suite-backup' || !parsed.data) { console.error('El 
 const kv = store();
 let n = 0;
 for (const [k, v] of Object.entries(parsed.data)) { await kv.set(k, v); n++; }
-console.log(`Importados ${n} registros en el almacén (${process.env.PRIME_STORE || 'blobs'}).`);
+console.log(`Importados ${n} registros en el almacén (${storeMode()}).`);
+if (storeMode() === 'sqlserver') await (await import('../sqlserver.ts')).closeDb();

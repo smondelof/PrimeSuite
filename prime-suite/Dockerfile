@@ -1,4 +1,4 @@
-# Prime Suite · imagen de producción autoalojada (Node + SQLite, sin servicios externos)
+# Prime Suite · imagen de producción autoalojada (Node; datos en SQL Server)
 # Etapa de compilación: instala dependencias y genera el frontend (dist/).
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
@@ -13,7 +13,7 @@ FROM node:22-bookworm-slim AS runtime
 ARG PRIME_VERSION=
 ENV PRIME_VERSION=${PRIME_VERSION} \
     NODE_ENV=production \
-    PRIME_STORE=sqlite \
+    PRIME_STORE=sqlserver \
     PRIME_SQLITE_PATH=/data/prime-suite.db \
     PORT=8080
 WORKDIR /app

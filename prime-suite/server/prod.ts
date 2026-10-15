@@ -1,8 +1,8 @@
 // Servidor de producción autoalojado: sirve la API y el frontend compilado (dist/) en un solo
 // proceso Node. Pensado para ir detrás de un proxy/balanceador que termina el TLS (o un proxy
 // propio que sirve HTTPS con vuestro certificado). Lee la configuración de variables de entorno.
-process.env.PRIME_STORE ??= 'sqlite';                 // motor de almacenamiento (fichero SQLite)
-process.env.PRIME_SQLITE_PATH ??= '/data/prime-suite.db';
+process.env.PRIME_STORE ??= 'sqlserver';              // motor de almacenamiento (SQL Server; 'sqlite' también significa SQL Server)
+process.env.PRIME_SQLITE_PATH ??= '/data/prime-suite.db'; // SQLite anterior: solo se lee para migrar sus datos
 process.env.PRIME_ALLOW_PRIVATE_FETCH ??= '1';        // herramienta interna: permite llegar a Superset/servicios en red privada
 
 import { createServer } from 'node:http';
@@ -11,6 +11,7 @@ import path from 'node:path';
 import { handle } from './app.ts';
 import { handleDemo } from './demo.ts';
 import { handleTwon, isTwonPath } from './proxy2n.ts';
+import { storeMode } from './store.ts';
 
 const port = Number(process.env.PORT || 8080);
 const host = process.env.HOST || '0.0.0.0';
@@ -67,7 +68,14 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(port, host, () => console.log(`Prime Suite escuchando en http://${host}:${port} · almacenamiento=${process.env.PRIME_STORE}`));
+server.listen(port, host, () => {
+  console.log(`Prime Suite escuchando en http://${host}:${port} · almacenamiento=${storeMode()}`);
+  // Conecta a SQL Server al arrancar; si no hay fichero de conexión o falla, la web pedirá los datos.
+  if (storeMode() === 'sqlserver') import('./sqlserver.ts').then((db) => db.initDb({ server: true })).catch((e) => console.error('[prime-suite] SQL Server:', e));
+});
 
 // Apagado limpio (Docker envía SIGTERM).
-for (const sig of ['SIGTERM', 'SIGINT'] as const) process.on(sig, () => server.close(() => process.exit(0)));
+for (const sig of ['SIGTERM', 'SIGINT'] as const) process.on(sig, () => server.close(async () => {
+  if (storeMode() === 'sqlserver') await (await import('./sqlserver.ts')).closeDb();
+  process.exit(0);
+}));

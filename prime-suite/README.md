@@ -1,17 +1,17 @@
 # Prime Suite v2 · Prime ID
 
 Portal de aplicaciones con **SSO propio (Prime ID)**, **integración de cualquier app por URL**, **panel de widgets** y módulos nativos (**Prime Insights** y **Atajos de Evalos**).
-Frontend React + Vite y backend Node/TypeScript. No necesita base de datos externa: en producción los datos del portal están en SQLite.
+Frontend React + Vite y backend Node/TypeScript. En producción los datos del portal están en SQL Server (la app crea sola la base de datos y las tablas).
 
 ---
 
 ## 1. Despliegue
 
-### Producción · servidor Ubuntu propio (Docker + SQLite)
+### Producción · servidor Ubuntu propio (Docker + SQL Server)
 
 - **Cada push a `main` se despliega solo** en el servidor Ubuntu (`/opt/primesuite`) con el workflow `.github/workflows/deploy-ubuntu.yml` («Desplegar en Ubuntu»), que corre en un runner autoalojado del propio servidor.
 - `scripts/deploy-ubuntu.sh` hace backup de los datos, reconstruye la imagen, reinicia la app y comprueba `/api/health`. Si la versión nueva no responde, vuelve sola a la anterior.
-- La app es un único contenedor (`server/prod.ts`) que sirve la API y el frontend compilado. Los datos van en `/data/prime-suite.db` dentro del volumen Docker `prime-data`.
+- La app es un único contenedor (`server/prod.ts`) que sirve la API y el frontend compilado. Los datos van en SQL Server; la conexión se configura desde la web y se guarda en `/data/sqlserver.json` dentro del volumen Docker `prime-data` (ver «Base de datos» en `deploy/DEPLOY.md`).
 - Instalación inicial, HTTPS, backups y migración desde Netlify: [`../deploy/DEPLOY.md`](../deploy/DEPLOY.md).
 
 Variables de entorno (en `deploy/.env` del servidor; nunca en el repo):
@@ -20,7 +20,7 @@ Variables de entorno (en `deploy/.env` del servidor; nunca en el repo):
 |---|---|
 | `PRIME_ISSUER` | **Obligatoria.** URL https exacta con la que se entra al portal, sin barra final. Es el issuer del SSO. |
 | `PRIME_SECRET_KEY` | Clave con la que se cifran todos los secretos guardados (AES-256-GCM): contraseñas de Superset, Client Secret de la API REST, cadenas de conexión de Evalos, credenciales del inicio automático. Larga, aleatoria y **estable** (si cambia, lo cifrado deja de poder leerse). |
-| `PRIME_STORE` / `PRIME_SQLITE_PATH` | Almacenamiento (`sqlite`, `/data/prime-suite.db`). Los fija el Dockerfile; no cambiar. |
+| `PRIME_STORE` / `PRIME_SQLITE_PATH` | Almacenamiento (`sqlserver`) y SQLite anterior que se migra la primera vez. Los fija el Dockerfile; no cambiar. |
 | `PRIME_ALLOW_PRIVATE_FETCH` | `1` = las salidas del servidor (`safeFetch`) pueden llegar a redes privadas (Superset, Evalos internos…). `server/prod.ts` lo activa por defecto. |
 | `TWON_UPSTREAM` / `TWON_TLS_FINGERPRINT` | Destino del proxy de 2N Access Commander y huella SHA-256 de su certificado. |
 | `EVALOS_TZ` | Zona horaria de las fechas de Evalos (por defecto `Europe/Madrid`). |
@@ -275,7 +275,7 @@ server/
   app.ts · prod.ts · dev.ts   montaje de rutas · servidor de producción (Docker) · servidor de desarrollo
   http.ts          router propio (Router, json, body, HttpError)
   access.ts        contexto de la petición, permisos (requireUser / requireAdmin / requireSuper, moduleRole) y claims
-  db.ts · store.ts modelo de datos sobre KV · almacenamiento SQLite (servidor) / Netlify Blobs / ficheros locales
+  db.ts · store.ts modelo de datos sobre KV · almacenamiento SQL Server (servidor, ver sqlserver.ts) / Netlify Blobs / ficheros locales
   crypto.ts        claves RS256, JWKS, rotación, sesiones, contraseñas, cifrado de secretos
   netguard.ts      safeFetch: protección SSRF en todas las peticiones salientes
   routes/

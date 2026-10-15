@@ -1,8 +1,6 @@
-// Capa de almacenamiento: Netlify Blobs (nube), SQLite (autoalojado) o ficheros JSON (local).
+// Capa de almacenamiento: Netlify Blobs (nube), SQL Server (autoalojado) o ficheros JSON (local).
 import { getStore } from '@netlify/blobs';
 import { promises as fs } from 'node:fs';
-import { mkdirSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import path from 'node:path';
 
 export interface KV {
@@ -12,38 +10,51 @@ export interface KV {
   keys(prefix: string): Promise<string[]>;
 }
 
-// Almacenamiento en SQLite (un único fichero) para instalaciones autoalojadas.
-// Usa el módulo nativo de Node (node:sqlite), sin dependencias externas. Se carga de forma
-// perezosa: solo se requiere cuando PRIME_STORE=sqlite, así no afecta al despliegue en Netlify.
-class SqliteKV implements KV {
-  private db: any;
-  private esc(s: string) { return s.replace(/[\\%_]/g, '\\$&'); }
-  constructor(file: string) {
-    mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
-    const require = createRequire(import.meta.url);
-    const { DatabaseSync } = require('node:sqlite');
-    this.db = new DatabaseSync(file);
-    this.db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000; CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT NOT NULL)');
-  }
+// Almacenamiento en SQL Server para instalaciones autoalojadas (ver server/sqlserver.ts).
+// Una fila por clave en dbo.PrimeSuite_Datos; el valor es el JSON del registro.
+class SqlServerKV implements KV {
+  private mod = import('./sqlserver.ts');
   async get<T>(key: string) {
-    const row = this.db.prepare('SELECT v FROM kv WHERE k = ?').get(key) as { v: string } | undefined;
-    return row ? (JSON.parse(row.v) as T) : null;
+    const m = await this.mod;
+    return m.withPool(async (pool, sql) => {
+      const r = await pool.request().input('k', sql.NVarChar(m.KEY_MAX), m.dbKey(key)).query(`SELECT Valor FROM ${m.DATA_TABLE} WHERE Clave = @k`);
+      const v = r.recordset[0]?.Valor as string | undefined;
+      return v === undefined ? null : (JSON.parse(v) as T);
+    });
   }
   async set(key: string, value: unknown, opts?: { onlyIfNew?: boolean }) {
-    const v = JSON.stringify(value);
-    if (opts?.onlyIfNew) {
-      const r = this.db.prepare('INSERT OR IGNORE INTO kv (k, v) VALUES (?, ?)').run(key, v);
-      return r.changes > 0;
-    }
-    this.db.prepare('INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v').run(key, v);
-    return true;
+    const m = await this.mod;
+    const v = JSON.stringify(value ?? null);
+    return m.withPool(async (pool, sql) => {
+      const req = pool.request().input('k', sql.NVarChar(m.KEY_MAX), m.dbKey(key)).input('v', sql.NVarChar(sql.MAX), v);
+      if (opts?.onlyIfNew) {
+        try {
+          await req.query(`INSERT INTO ${m.DATA_TABLE} (Clave, Valor) VALUES (@k, @v)`);
+          return true;
+        } catch (e: any) {
+          if (e?.number === 2627 || e?.number === 2601) return false; // ya existía
+          throw e;
+        }
+      }
+      await req.query(`SET XACT_ABORT ON;
+        BEGIN TRAN;
+        UPDATE ${m.DATA_TABLE} WITH (UPDLOCK, SERIALIZABLE) SET Valor = @v, Actualizado = SYSUTCDATETIME() WHERE Clave = @k;
+        IF @@ROWCOUNT = 0 INSERT INTO ${m.DATA_TABLE} (Clave, Valor) VALUES (@k, @v);
+        COMMIT;`);
+      return true;
+    });
   }
   async del(key: string) {
-    this.db.prepare('DELETE FROM kv WHERE k = ?').run(key);
+    const m = await this.mod;
+    await m.withPool((pool, sql) => pool.request().input('k', sql.NVarChar(m.KEY_MAX), m.dbKey(key)).query(`DELETE FROM ${m.DATA_TABLE} WHERE Clave = @k`));
   }
   async keys(prefix: string) {
-    const rows = this.db.prepare("SELECT k FROM kv WHERE k LIKE ? ESCAPE '\\' ORDER BY k").all(this.esc(prefix) + '%') as { k: string }[];
-    return rows.map((r) => r.k);
+    const m = await this.mod;
+    return m.withPool(async (pool, sql) => {
+      const r = await pool.request().input('p', sql.NVarChar(m.KEY_MAX + 10), m.likePrefix(prefix))
+        .query(`SELECT Clave FROM ${m.DATA_TABLE} WHERE Clave LIKE @p ESCAPE N'\\' ORDER BY Clave`);
+      return r.recordset.map((row: { Clave: string }) => row.Clave);
+    });
   }
 }
 
@@ -126,16 +137,25 @@ class FileKV implements KV {
 }
 
 let kv: KV | null = null;
+
+/**
+ * Motor de almacenamiento: 'sqlserver' (autoalojado), 'file' (desarrollo local) o 'blobs' (Netlify).
+ * PRIME_STORE=sqlite (instalaciones anteriores) ahora significa SQL Server: el fichero SQLite
+ * solo se lee una vez para migrar sus datos.
+ */
+export function storeMode(): 'sqlserver' | 'file' | 'blobs' {
+  const m = (process.env.PRIME_STORE || '').toLowerCase();
+  if (m === 'sqlserver' || m === 'mssql' || m === 'sqlite') return 'sqlserver';
+  if (m === 'file') return 'file';
+  return 'blobs';
+}
+
 export function store(): KV {
   if (kv) return kv;
-  // Selector de motor: 'sqlite' (autoalojado), 'file' (desarrollo local) o Blobs (Netlify, por defecto).
-  if (process.env.PRIME_STORE === 'sqlite') {
-    kv = new SqliteKV(process.env.PRIME_SQLITE_PATH || path.resolve('.data/prime-suite.db'));
-  } else if (process.env.PRIME_STORE === 'file') {
-    kv = new FileKV(process.env.PRIME_DATA_DIR || path.resolve('.data'));
-  } else {
-    kv = new BlobKV();
-  }
+  const mode = storeMode();
+  if (mode === 'sqlserver') kv = new SqlServerKV();
+  else if (mode === 'file') kv = new FileKV(process.env.PRIME_DATA_DIR || path.resolve('.data'));
+  else kv = new BlobKV();
   return kv;
 }
 

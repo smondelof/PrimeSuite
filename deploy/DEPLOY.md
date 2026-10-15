@@ -1,9 +1,31 @@
-# Prime Suite · despliegue autoalojado (Linux + Docker + SQLite)
+# Prime Suite · despliegue autoalojado (Linux + Docker + SQL Server)
 
 Guía para instalar Prime Suite en un servidor propio y poder **replicarlo** en otras instalaciones.
 La app es un único contenedor Node que sirve el frontend y la API; todos los datos se guardan en
-un **fichero SQLite** dentro de un volumen Docker (`/data/prime-suite.db`). No hace falta ninguna
-base de datos externa.
+**SQL Server** (ver «Base de datos» más abajo). En el volumen Docker `/data` solo quedan el fichero de
+conexión y el SQLite anterior, que se migra solo la primera vez.
+
+## Base de datos (SQL Server)
+
+Prime Suite guarda todos sus datos en **SQL Server** (tabla `dbo.PrimeSuite_Datos`: una fila por registro, con
+`Clave`, `Ambito`, `Valor` en JSON, `Creado` y `Actualizado`; y `dbo.PrimeSuite_Info` con la versión del esquema y la
+migración). La app **crea sola** la base de datos si no existe, las tablas y las columnas que falten al conectar.
+
+- Los datos de conexión están en `/data/sqlserver.json` (dentro del volumen, nunca en el repo), con la contraseña
+  cifrada con `PRIME_SECRET_KEY`. Desplegar el código no los toca.
+- Si ese fichero no existe o la conexión falla, la web muestra el formulario **Base de datos SQL Server**. Para
+  guardarlo hace falta el **código de configuración** que la app escribe al arrancar en el log y en
+  `/data/codigo-configuracion.txt`:
+  ```bash
+  docker compose logs app | grep -A1 "Código de configuración"
+  docker compose exec app cat /data/codigo-configuracion.txt
+  ```
+- Si se pierde la conexión, la app reintenta sola cada 30 s y mientras tanto muestra el formulario (con «Reintentar ahora»).
+- La primera vez copia a SQL Server todo lo que había en el SQLite anterior (`/data/prime-suite.db`), sin sobrescribir
+  nada. El fichero SQLite se conserva como copia y queda marcado (`prime-suite.db.migrado-a-sqlserver`) para no migrarlo dos veces.
+- Usa **una base de datos distinta por entorno** (desarrollo y producción).
+- El usuario de SQL Server necesita `db_owner` en la base de datos (o permiso `CREATE DATABASE` si debe crearla).
+
 
 ---
 
@@ -130,13 +152,10 @@ Los datos persisten en el volumen `prime-data`; la actualización no los toca.
 
 ## 7. Copias de seguridad
 
-Todo está en un fichero. Dos opciones:
+Los datos están en SQL Server: haz copias de la base de datos con las herramientas de SQL Server.
+Además, cada despliegue guarda un backup lógico en JSON en `backups/`, y se puede hacer a mano:
 
 ```bash
-# a) copiar el fichero SQLite (hazlo con el contenedor parado o usa el backup lógico de abajo)
-docker compose cp app:/data/prime-suite.db ./prime-suite-$(date +%F).db
-
-# b) backup lógico en JSON (en caliente)
 docker compose exec app npm run backup /data/backup.json
 docker compose cp app:/data/backup.json ./prime-suite-$(date +%F).json
 ```
@@ -195,7 +214,7 @@ Las contraseñas, cadenas de conexión y secretos se guardan cifrados con `PRIME
 | `TZ` | Zona horaria del contenedor. |
 | `PRIME_COOKIE_NAME` | Nombre de la cookie de sesión (empieza por `ps_`, por defecto `ps_session`). Distinto en cada instalación que comparta dominio, porque las cookies no distinguen puertos. |
 | `PRIME_VERSION` | Versión publicada (la fijan el paquete instalable y la imagen; en desarrollo `/api/health` devuelve «desarrollo»). |
-| `PRIME_STORE` / `PRIME_SQLITE_PATH` | Almacenamiento SQLite. No cambiar. |
+| `PRIME_STORE` / `PRIME_SQLITE_PATH` | Almacenamiento: SQL Server (`sqlite` en instalaciones antiguas significa lo mismo) y SQLite anterior que se migra. No cambiar. |
 
 ---
 

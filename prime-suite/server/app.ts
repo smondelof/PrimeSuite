@@ -1,5 +1,6 @@
 // Punto de entrada común: lo usan la función de Netlify y el servidor local.
-import { Router, json, HttpError, assertSameOrigin } from './http.ts';
+import { Router, json, body, HttpError, assertSameOrigin } from './http.ts';
+import { storeMode } from './store.ts';
 import { authRoutes } from './routes/auth.ts';
 import { oidcRoutes } from './routes/oidc.ts';
 import { portalRoutes } from './routes/portal.ts';
@@ -9,7 +10,29 @@ import { evalosRoutes } from './routes/evalos.ts';
 import { teletrabajoRoutes } from './routes/teletrabajo.ts';
 
 const router = new Router();
-router.get('/api/health', async () => json({ ok: true, service: 'prime-suite', version: process.env.PRIME_VERSION || 'desarrollo' }));
+router.get('/api/health', async () => {
+  const out: Record<string, unknown> = { ok: true, service: 'prime-suite', version: process.env.PRIME_VERSION || 'desarrollo', store: storeMode() };
+  if (storeMode() === 'sqlserver') out.db = (await import('./sqlserver.ts')).dbStatus().status;
+  return json(out);
+});
+
+// Conexión a SQL Server (instalaciones autoalojadas): estado, reintento y alta desde la web.
+router.get('/api/db/status', async () => {
+  if (storeMode() !== 'sqlserver') return json({ store: storeMode(), status: 'lista', ready: true });
+  const db = await import('./sqlserver.ts');
+  await db.initDb();
+  return json(db.dbStatus());
+});
+router.post('/api/db/retry', async () => {
+  if (storeMode() !== 'sqlserver') throw new HttpError(404, 'No se usa SQL Server');
+  return json(await (await import('./sqlserver.ts')).retryDb());
+});
+router.post('/api/db/config', async (req) => {
+  if (storeMode() !== 'sqlserver') throw new HttpError(404, 'No se usa SQL Server');
+  const b = await body<Record<string, unknown>>(req).catch(() => null);
+  if (!b || typeof b !== 'object') throw new HttpError(400, 'Datos no válidos');
+  return json(await (await import('./sqlserver.ts')).configureDb(b as any));
+});
 
 // Diagnóstico temporal del almacenamiento (Netlify Blobs). Quitar cuando esté resuelto.
 router.get('/api/_diag', async () => {
@@ -63,6 +86,8 @@ export async function handle(req: Request): Promise<Response> {
   try {
     const path = new URL(req.url).pathname;
     if (path.startsWith('/api/') && !CROSS_ORIGIN.includes(path)) assertSameOrigin(req);
+    // Sin conexión a SQL Server solo responden la salud y la configuración de la base de datos.
+    if (storeMode() === 'sqlserver' && path !== '/api/health' && !path.startsWith('/api/db/')) await (await import('./sqlserver.ts')).getPool();
     const res = await router.handle(req);
     return res || json({ error: 'No encontrado' }, 404);
   } catch (e: any) {

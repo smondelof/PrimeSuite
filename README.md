@@ -1,7 +1,7 @@
 # Prime Suite v2 · Prime ID
 
 Portal de aplicaciones con **SSO propio (Prime ID)**, **integración de cualquier app por URL**, **panel de widgets** y módulos nativos: **Prime Insights** (dashboards de Superset) y **Atajos de Evalos** (Evalos 8).
-Frontend React + Vite y backend Node/TypeScript. En producción corre en **nuestro servidor Ubuntu (Docker + SQLite)**; Netlify queda como entorno de pruebas.
+Frontend React + Vite y backend Node/TypeScript. En producción corre en **nuestro servidor Ubuntu (Docker) con los datos en SQL Server**; Netlify queda como entorno de pruebas.
 
 | Carpeta | Contenido |
 |---|---|
