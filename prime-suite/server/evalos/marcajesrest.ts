@@ -662,6 +662,21 @@ export async function assignHoliday(employee: string, date: string, type: string
   return { ms: r.ms };
 }
 
+/** Horas de vacaciones HH:MM (mayores que cero). */
+export function cleanHours(v: unknown): string {
+  const m = String(v ?? '').trim().match(/^(\d{1,2}):([0-5]\d)$/);
+  if (!m || (+m[1] === 0 && +m[2] === 0) || +m[1] > 24 || (+m[1] === 24 && +m[2] > 0)) throw new HttpError(400, 'Indica las horas de vacaciones en formato HH:MM');
+  return `${m[1].padStart(2, '0')}:${m[2]}`;
+}
+
+/** Asigna horas de vacaciones en el día (SOAP AsignarHorasVacaciones), para periodos en horas. */
+export async function assignHolidayHours(employee: string, date: string, type: string, hours: string, portalOrigin: string) {
+  if (!VAC_CODE.test(type)) throw new HttpError(400, 'Elige el tipo de vacaciones');
+  const r = await callEvalosSoap('AsignarHorasVacaciones', { employee, vacationType: type, date: toEvalosQueryDate(date), hours }, portalOrigin);
+  if (!soapOk(r.result)) throw new HttpError(502, `Evalos no ha asignado las horas de vacaciones: ${r.result.slice(0, 300)}`);
+  return { ms: r.ms };
+}
+
 /** Quita las vacaciones del día (SOAP BorrarVacaciones). */
 export async function removeHoliday(employee: string, date: string, portalOrigin: string) {
   const r = await callEvalosSoap('BorrarVacaciones', { employee, date: toEvalosQueryDate(date) }, portalOrigin);

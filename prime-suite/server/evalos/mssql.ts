@@ -1427,8 +1427,9 @@ export class SqlServerDriver implements EvalosDriver {
     };
     const n = (v: unknown) => Number(String(v ?? '').trim().replace(',', '.')) || 0;
     for (const r of await read('VACACIONES', [['emp', ['CODIGO']], ['type', ['VACACIONES']], ['f', ['FECHAINICIO', 'FECHAINCIO']], ['t', ['FECHAFIN']],
-      ['days', ['TOTALDIAS']], ['hours', ['TOTALHORAS']], ['ad', ['DIASASIGNADOS']], ['ah', ['HORASASIGNADAS']]])) {
-      vacations.push({ employee: txt(r.emp), type: txt(r.type), from: isoFromDb(r.f), to: isoFromDb(r.t), days: n(r.days), hours: n(r.hours), assignedDays: n(r.ad), assignedHours: n(r.ah) });
+      ['days', ['TOTALDIAS']], ['hours', ['TOTALHORAS']], ['ad', ['DIASASIGNADOS']], ['ah', ['HORASASIGNADAS']], ['pd', ['PERIODOENDIAS']]])) {
+      vacations.push({ employee: txt(r.emp), type: txt(r.type), from: isoFromDb(r.f), to: isoFromDb(r.t), days: n(r.days), hours: n(r.hours), assignedDays: n(r.ad), assignedHours: n(r.ah),
+        unit: String(r.pd ?? '1').trim() === '0' ? 'H' : 'D' });
     }
     for (const r of await read('INCIDENCIALIMITE', [['emp', ['CODIGO']], ['inc', ['INCIDENCIA']], ['f', ['FECHAINICIO', 'FECHAINCIO']], ['t', ['FECHAFIN']],
       ['lim', ['LIMITE']], ['val', ['VALOR']], ['pd', ['PERIODOENDIAS']]])) {

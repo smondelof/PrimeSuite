@@ -1,5 +1,0 @@
-
-> prime-suite@2.0.0 typecheck
-> tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit
-
-exit=0

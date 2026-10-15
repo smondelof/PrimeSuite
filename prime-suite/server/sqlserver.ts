@@ -288,7 +288,7 @@ async function migrateFromSqlite(pool: import('mssql').ConnectionPool, c: Conn):
 interface Installation { id: string; name: string; at: string }
 const installPath = () => path.join(dataDir(), '.instalacion');
 export function installName() {
-  return (process.env.PRIME_INSTALL_NAME || process.env.COMPOSE_PROJECT_NAME || '').trim() || hostname();
+  return (process.env.PRIME_INSTALL_NAME || process.env.COMPOSE_PROJECT_NAME || process.env.PRIME_ISSUER || '').trim() || hostname();
 }
 export function installation(): Installation {
   try {

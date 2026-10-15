@@ -599,11 +599,21 @@ function VacacionesDia({ marcaje, onSaved }: { marcaje: EvalosRestMarcaje; onSav
   const [list, setList] = useState<EvalosIncidencia[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [type, setType] = useState(current);
+  const [hours, setHours] = useState('');
   const [busy, setBusy] = useState(false);
+  // Periodos del empleado que incluyen el día: si el del tipo elegido es en horas, se piden horas (AsignarHorasVacaciones).
+  const [periods, setPeriods] = useState<{ type: string; unit: 'D' | 'H' }[]>([]);
   const toast = useToast();
   useEffect(() => { loadTiposVacaciones().then(setList, (e) => setErr(e.message)); }, []);
+  useEffect(() => {
+    api.get<{ items: { type: string; unit: 'D' | 'H' }[] }>(`/api/evalos/correcciones/periodosvacaciones?employee=${encodeURIComponent(marcaje.employee)}&date=${marcaje.date}`)
+      .then((r) => setPeriods(r.items), () => setPeriods([]));
+  }, [marcaje.employee, marcaje.date]);
+  const unitOf = (code: string) => periods.find((p) => p.type.toUpperCase() === code.toUpperCase())?.unit;
+  const inHours = !!type && unitOf(type) === 'H';
   const nameOf = (code: string) => list?.find((x) => x.code === code)?.name || code;
   const changed = type !== current;
+  const hoursOk = !inHours || /^\d{1,2}:[0-5]\d$/.test(hours.trim()) && hours.trim() !== '0:00' && hours.trim() !== '00:00';
 
   async function apply() {
     if (!changed) return;
@@ -613,8 +623,8 @@ function VacacionesDia({ marcaje, onSaved }: { marcaje: EvalosRestMarcaje; onSav
         await api.del('/api/evalos/correcciones/vacaciones', { employee: marcaje.employee, date: marcaje.date });
         toast(`Vacaciones quitadas del ${fmtDate(marcaje.date)}`);
       } else {
-        await api.post('/api/evalos/correcciones/vacaciones', { employee: marcaje.employee, date: marcaje.date, type, replace: !!current });
-        toast(`Vacaciones «${nameOf(type)}» asignadas el ${fmtDate(marcaje.date)}`);
+        await api.post('/api/evalos/correcciones/vacaciones', { employee: marcaje.employee, date: marcaje.date, type, replace: !!current, ...(inHours ? { hours: hours.trim() } : {}) });
+        toast(inHours ? `${hours.trim()} h de vacaciones «${nameOf(type)}» asignadas el ${fmtDate(marcaje.date)}` : `Vacaciones «${nameOf(type)}» asignadas el ${fmtDate(marcaje.date)}`);
       }
       onSaved();
     } catch (e: any) { toast(e.message, true); setBusy(false); }
@@ -628,12 +638,19 @@ function VacacionesDia({ marcaje, onSaved }: { marcaje: EvalosRestMarcaje; onSav
         <select className="select grow" style={{ minWidth: 180 }} value={type} onChange={(e) => setType(e.target.value)} disabled={!list && !current} aria-label="Vacaciones del día">
           <option value="">{list || current ? '— Sin vacaciones —' : 'Cargando…'}</option>
           {current && !list?.some((x) => x.code === current) && <option value={current}>{current}</option>}
-          {list?.map((x) => <option key={x.code} value={x.code}>{x.name || x.code}</option>)}
+          {list?.map((x) => <option key={x.code} value={x.code}>{x.name || x.code}{unitOf(x.code) === 'H' ? ' (en horas)' : ''}</option>)}
         </select>
-        <button type="button" className={`btn${changed && !type ? ' danger' : ''}`} disabled={busy || !changed} onClick={apply}>
-          {busy ? 'Guardando…' : !changed ? (current ? 'Vacaciones asignadas' : 'Asignar vacaciones') : type ? (current ? 'Cambiar vacaciones' : 'Asignar vacaciones') : 'Quitar vacaciones'}
+        {inHours && changed && (
+          <label className="field" style={{ margin: 0, width: 150 }} title="El periodo de este tipo de vacaciones está en horas: indica cuántas horas se asignan este día">
+            <span className="xs muted">Horas de vacaciones</span>
+            <input className="input mono" value={hours} onChange={(e) => setHours(e.target.value)} placeholder="HH:MM" inputMode="numeric" aria-label="Horas de vacaciones (HH:MM)" />
+          </label>
+        )}
+        <button type="button" className={`btn${changed && !type ? ' danger' : ''}`} style={{ alignSelf: 'flex-end' }} disabled={busy || !changed || !hoursOk} onClick={apply}>
+          {busy ? 'Guardando…' : !changed ? (current ? 'Vacaciones asignadas' : 'Asignar vacaciones') : type ? (inHours ? 'Asignar horas' : current ? 'Cambiar vacaciones' : 'Asignar vacaciones') : 'Quitar vacaciones'}
         </button>
       </div>
+      {inHours && changed && <span className="xs muted">Periodo en horas: se asignan las horas indicadas (HH:MM) en lugar del día completo.</span>}
     </div>
   );
 }

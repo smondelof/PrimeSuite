@@ -29,6 +29,10 @@ const WSDL = `<?xml version="1.0"?><wsdl:definitions targetNamespace="http://Sui
 <s:element name="BorrarVacaciones"><s:complexType><s:sequence>
 <s:element name="EmpresaConexion" type="s:string"/><s:element name="CodigoPersonal" type="s:string"/><s:element name="FechaVacaciones" type="s:string"/>
 </s:sequence></s:complexType></s:element>
+<s:element name="AsignarHorasVacaciones"><s:complexType><s:sequence>
+<s:element name="EmpresaConexion" type="s:string"/><s:element name="CodigoPersonal" type="s:string"/><s:element name="CodigoVacaciones" type="s:string"/>
+<s:element name="FechaVacaciones" type="s:string"/><s:element name="Horas" type="s:string"/>
+</s:sequence></s:complexType></s:element>
 <s:element name="Srv_AppVersion"><s:complexType/></s:element>
 </s:schema></wsdl:types></wsdl:definitions>`;
 
@@ -104,6 +108,17 @@ test('Cambiar: primero BorrarVacaciones y luego AsignarDiaVacaciones; quitar: Bo
   calls.length = 0;
   assert.equal((await call('DELETE', '/api/evalos/correcciones/vacaciones', { employee: '43699738', date: '2026-10-08' })).status, 200);
   assert.match(calls[0].body, /<BorrarVacaciones xmlns="http:\/\/SuiteControls.Net\/"><EmpresaConexion>133<\/EmpresaConexion><CodigoPersonal>43699738<\/CodigoPersonal><FechaVacaciones>08\/10\/2026<\/FechaVacaciones><\/BorrarVacaciones>/);
+});
+
+test('periodos en horas: AsignarHorasVacaciones con las horas HH:MM', async () => {
+  const { assignHolidayHours, cleanHours } = await import('./evalos/marcajesrest.ts');
+  assert.equal(cleanHours('4:30'), '04:30');
+  assert.throws(() => cleanHours('0:00'));
+  assert.throws(() => cleanHours('8'));
+  calls.length = 0;
+  await assignHolidayHours('43699738', '2026-10-08', 'H25', '04:30', ISS);
+  assert.equal(calls[0].action, '"http://SuiteControls.Net/AsignarHorasVacaciones"');
+  assert.match(calls[0].body, /<CodigoVacaciones>H25<\/CodigoVacaciones><FechaVacaciones>08\/10\/2026<\/FechaVacaciones><Horas>04:30<\/Horas>/);
 });
 
 test('si Evalos devuelve un mensaje en lugar de Ok, se muestra como error', async () => {

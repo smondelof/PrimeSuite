@@ -61,10 +61,11 @@ async function describe(url: string, portalOrigin: string, force = false): Promi
 }
 
 /** Qué valor lleva cada parámetro según su nombre. */
-export type SoapValues = { company?: string; employee?: string; vacationType?: string; date?: string };
+export type SoapValues = { company?: string; employee?: string; vacationType?: string; date?: string; hours?: string };
 export function valueFor(param: string, v: SoapValues): string {
   const p = param.toLowerCase();
   if (/empresa|conexion|connection|company/.test(p)) return v.company ?? '';
+  if (/^horas?$|hora|hours/.test(p)) return v.hours ?? '';
   if (/fecha|^dia|date|^day/.test(p)) return v.date ?? '';
   if (/vacacion|tipo/.test(p)) return v.vacationType ?? '';
   if (/personal|empleado|employee|codigo|code/.test(p)) return v.employee ?? '';

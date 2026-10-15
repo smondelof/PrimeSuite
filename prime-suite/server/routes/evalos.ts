@@ -20,7 +20,7 @@ import {
   sanitizeValidation, sanitizeWfSettings, validationMap, workflowSql, type WorkflowPerson, type WorkflowSettings, type WorkflowSyncResult
 } from '../evalos/workflow.ts';
 import type { Personal } from '../evalos/types.ts';
-import { loadMarcajes, type OrgFilter, NORMAL_INCIDENCE, savePunches, deletePunches, cleanDeleteTimes, saveAbsence, deleteAbsence, assignHoliday, removeHoliday, cleanRange, cleanEmployeeCode, cleanPunchWrites } from '../evalos/marcajesrest.ts';
+import { loadMarcajes, type OrgFilter, NORMAL_INCIDENCE, savePunches, deletePunches, cleanDeleteTimes, saveAbsence, deleteAbsence, assignHoliday, assignHolidayHours, cleanHours, removeHoliday, cleanRange, cleanEmployeeCode, cleanPunchWrites } from '../evalos/marcajesrest.ts';
 
 export const EVALOS_CLIENT_ID = 'atajos-evalos';
 export const EVALOS_PATH = '/evalos';
@@ -962,7 +962,23 @@ export function evalosRoutes(r: Router) {
     const items = (labels?.holidays || []).map(({ code, name }) => ({ code, name })).sort((a, b) => a.code.localeCompare(b.code));
     return json({ items }, 200, { 'cache-control': 'no-store' });
   });
-  // Asignar (o cambiar) las vacaciones del día: AsignarDiaVacaciones; si ya tenía otro tipo, antes BorrarVacaciones.
+  // Periodos de vacaciones del empleado que incluyen el día (tabla VACACIONES): tipo y si son en días o en horas.
+  const periodsOn = async (companyId: string, employee: string, date: string) => {
+    const { driver } = await driverFor(companyId);
+    if (!driver.listEmployeePeriods) return [];
+    const { vacations } = await driver.listEmployeePeriods([employee], date);
+    return vacations.filter((v) => v.employee === employee && v.from <= date && (!v.to || v.to >= date))
+      .map((v) => ({ type: v.type, unit: v.unit || 'D', from: v.from, to: v.to, days: v.days, hours: v.hours, assignedDays: v.assignedDays, assignedHours: v.assignedHours }));
+  };
+  r.get('/api/evalos/correcciones/periodosvacaciones', async (req) => {
+    const { c } = await requireEvalos(req);
+    const u = new URL(req.url);
+    const employee = cleanEmployeeCode(u.searchParams.get('employee') || '', true);
+    const date = isoDate(u.searchParams.get('date'));
+    return json({ items: await periodsOn(c.company.id, employee, date) }, 200, { 'cache-control': 'no-store' });
+  });
+  // Asignar (o cambiar) las vacaciones del día: AsignarDiaVacaciones, o AsignarHorasVacaciones si el periodo del
+  // tipo es en horas; si ya tenía otro tipo, antes BorrarVacaciones.
   r.post('/api/evalos/correcciones/vacaciones', async (req) => {
     const { c, canEdit } = await requireEvalos(req);
     if (!canEdit) throw new HttpError(403, 'Tu rol en Atajos de Evalos es de solo lectura');
@@ -970,9 +986,12 @@ export function evalosRoutes(r: Router) {
     const employee = cleanEmployeeCode(b.employee, true);
     const date = isoDate(b.date);
     const type = str(b.type, 10);
+    const period = (await periodsOn(c.company.id, employee, date).catch(() => [])).find((p) => p.type.toUpperCase() === type.toUpperCase());
+    const inHours = period?.unit === 'H';
+    const hours = inHours ? cleanHours(b.hours) : '';
     if (b.replace) await removeHoliday(employee, date, c.issuer);
-    const r2 = await assignHoliday(employee, date, type, c.issuer);
-    await log(c, req, 'evalos.soap_vacaciones_asignadas', employee, `${date} · tipo ${type}`);
+    const r2 = inHours ? await assignHolidayHours(employee, date, type, hours, c.issuer) : await assignHoliday(employee, date, type, c.issuer);
+    await log(c, req, 'evalos.soap_vacaciones_asignadas', employee, `${date} · tipo ${type}${inHours ? ` · ${hours} h` : ''}`);
     return json({ ok: true, ...r2 }, 201);
   });
   r.del('/api/evalos/correcciones/vacaciones', async (req) => {
