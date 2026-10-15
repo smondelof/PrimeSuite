@@ -1,3 +1,0 @@
-
-added 179 packages in 6s
-exit=0

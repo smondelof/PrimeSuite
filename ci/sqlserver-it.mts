@@ -42,7 +42,14 @@ assert.equal(db.dbStatus().status, 'sin-configurar');
 const code = readFileSync(path.join(dir, 'codigo-configuracion.txt'), 'utf8').trim();
 console.log('código', code);
 
-// 3. Código incorrecto, credenciales incorrectas
+// 3. Esperar a que SQL Server acepte conexiones; luego código incorrecto y credenciales incorrectas
+{
+  const sql: any = (await import('../prime-suite/node_modules/mssql/index.js')).default;
+  for (let i = 0; ; i++) {
+    try { const p = await new sql.ConnectionPool({ server: 'localhost', user: 'sa', password: PASS, database: 'master', options: { trustServerCertificate: true } }).connect(); await p.close(); break; }
+    catch (e: any) { if (i > 40) throw e; console.log('esperando a SQL Server…', e.message); await new Promise((s) => setTimeout(s, 3000)); }
+  }
+}
 await assert.rejects(db.configureDb({ code: 'AAAAA-BBBBB', server: 'localhost', database: 'X', user: 'sa', password: PASS }), /código/);
 await assert.rejects(db.configureDb({ code, server: 'localhost', database: 'PrimeSuiteCI', user: 'sa', password: 'mala' }), /Usuario o contraseña/);
 console.log('errores de credenciales OK:', db.dbStatus().error);
