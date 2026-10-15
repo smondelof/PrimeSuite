@@ -16,6 +16,8 @@ async function request<T>(method: string, url: string, data?: unknown): Promise<
   const json = text ? JSON.parse(text) : null;
   if (!res.ok) {
     if (res.status === 401 && !url.startsWith('/api/auth') && !url.startsWith('/api/me')) window.dispatchEvent(new Event('ps:unauthorized'));
+    // Sin conexión a SQL Server: la app vuelve a la pantalla de conexión.
+    if (res.status === 503 && json?.code === 'DB_SETUP' && !url.startsWith('/api/db/')) window.dispatchEvent(new Event('ps:dbsetup'));
     throw new ApiError(res.status, json?.error || `Error ${res.status}`, json?.code);
   }
   return json as T;
