@@ -146,6 +146,32 @@ console.log('/api/setup/status tras configurar', me2.status, await me2.text());
 assert.equal(me2.status, 200);
 s2.p.kill('SIGTERM');
 
+// 8b. Otra instalación (otro entorno) contra la base de datos de la primera: se bloquea
+const dir3 = mkdtempSync(path.join(tmpdir(), 'ps-it3-'));
+const s3 = await runServer(18557, { PRIME_DATA_DIR: dir3, PRIME_SQLITE_PATH: path.join(dir3, 'prime-suite.db'), COMPOSE_PROJECT_NAME: 'primesuite-prod' });
+const st3 = await (await fetch('http://127.0.0.1:18557/api/db/status')).json();
+console.log('status otra instalación', JSON.stringify({ suggestedDatabase: st3.suggestedDatabase, installation: st3.installation }));
+assert.equal(st3.suggestedDatabase, 'PrimeSuite_Prod');
+const code3 = readFileSync(path.join(dir3, 'codigo-configuracion.txt'), 'utf8').trim();
+const cfg3 = { code: code3, server: 'localhost', database: 'PrimeSuiteCI', user: 'sa', password: PASS, encrypt: true, trustServerCertificate: true };
+const clash = await fetch('http://127.0.0.1:18557/api/db/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(cfg3) });
+const clashBody = await clash.json();
+console.log('misma BD desde otra instalación', clash.status, JSON.stringify(clashBody));
+assert.equal(clash.status, 409);
+assert.equal(clashBody.code, 'DB_IN_USE');
+assert.ok(!existsSync(path.join(dir3, 'sqlserver.json')), 'no debe guardar la conexión');
+const sys = await fetch('http://127.0.0.1:18557/api/db/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...cfg3, database: 'master' }) });
+console.log('BD del sistema', sys.status, await sys.text());
+assert.equal(sys.status, 400);
+const own = await fetch('http://127.0.0.1:18557/api/db/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...cfg3, database: 'PrimeSuiteCI_Prod' }) });
+console.log('BD propia', own.status);
+assert.equal(own.status, 200);
+s3.p.kill('SIGTERM');
+// La primera instalación sigue entrando en su BD
+const s1b = await runServer(18558, {});
+assert.equal(s1b.h.db, 'lista');
+s1b.p.kill('SIGTERM');
+
 // 9. Backup por línea de comandos (debe terminar solo)
 const t0 = Date.now();
 await new Promise<void>((res, rej) => {
