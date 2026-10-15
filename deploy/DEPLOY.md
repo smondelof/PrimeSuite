@@ -217,7 +217,7 @@ automáticos**: solo se instala lo que se publica como versión y solo cuando se
 
 ### 11.1 Publicar una versión
 GitHub › Actions › **Publicar versión** › Run workflow, con la versión (`1.0.0`, `1.1.0`…) y la rama o
-commit (por defecto `main`). Construye la imagen `ghcr.io/marcriera-cmd/primesuite:<versión>`, crea el tag
+commit (por defecto `main`). Construye la imagen `ghcr.io/smondelof/primesuite:<versión>`, crea el tag
 `v<versión>` y una Release con el paquete `primesuite-<versión>.tar.gz` (carpeta `release/` del repo:
 `docker-compose.yml`, `.env.example`, `Caddyfile`, `install.sh`, `update.sh`, `LEEME.md`).
 Una versión publicada no se puede volver a publicar: para corregir algo, se publica un número nuevo.

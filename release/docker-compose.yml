@@ -8,7 +8,7 @@
 #   docker compose --profile tls up -d    # además, HTTPS directo con Caddy en HTTPS_PORT
 services:
   app:
-    image: ${PRIME_IMAGE:-ghcr.io/marcriera-cmd/primesuite}:${PRIME_VERSION:?Falta PRIME_VERSION en .env}
+    image: ${PRIME_IMAGE:-ghcr.io/smondelof/primesuite}:${PRIME_VERSION:?Falta PRIME_VERSION en .env}
     container_name: ${COMPOSE_PROJECT_NAME:?Falta COMPOSE_PROJECT_NAME en .env}
     restart: unless-stopped
     env_file: .env

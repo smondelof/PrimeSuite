@@ -43,7 +43,7 @@ env:
 
 jobs:
   deploy:
-    if: github.repository_owner == 'marcriera-cmd'
+    if: github.repository_owner == 'smondelof'
     runs-on: [self-hosted, linux, primesuite]
     environment: produccion
     timeout-minutes: 30

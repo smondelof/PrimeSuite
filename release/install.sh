@@ -88,7 +88,7 @@ if [[ -n "$TLS" ]]; then
   fi
 fi
 IMAGE="$(grep -E '^PRIME_IMAGE=' "$PKG/.env.example" | cut -d= -f2-)"
-IMAGE="${IMAGE:-ghcr.io/marcriera-cmd/primesuite}"
+IMAGE="${IMAGE:-ghcr.io/smondelof/primesuite}"
 
 cat <<EOF
 

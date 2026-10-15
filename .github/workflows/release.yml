@@ -1,7 +1,7 @@
 # Publicar una versión de Prime Suite (se lanza a mano desde la pestaña Actions)
 #
 # 1. Construye la imagen Docker en los servidores de GitHub y la publica en
-#    ghcr.io/marcriera-cmd/primesuite:<versión> (y :latest).
+#    ghcr.io/smondelof/primesuite:<versión> (y :latest).
 # 2. Genera el paquete instalable primesuite-<versión>.tar.gz (carpeta release/).
 # 3. Crea el tag v<versión> y la Release de GitHub con el paquete adjunto.
 # No despliega nada: para producción, lanza después «Desplegar en Producción».
@@ -31,7 +31,7 @@ permissions:
 
 jobs:
   publish:
-    if: github.repository_owner == 'marcriera-cmd'
+    if: github.repository_owner == 'smondelof'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:

@@ -11,7 +11,7 @@
 #   2. Copia de seguridad de los datos en DIR/backups (npm run backup).
 #   3. Cambia PRIME_VERSION en .env y reinicia la app.
 #   4. Comprueba /api/health; si falla, vuelve a la versión anterior.
-# Nunca toca .env (salvo PRIME_VERSION), certs/, backups/ ni el volumen de datos.
+# Nunca toca .env (salvo PRIME_VERSION y, desde un paquete, PRIME_IMAGE), certs/, backups/ ni el volumen de datos.
 # Para volver atrás basta con: bash update.sh <versión anterior>
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
@@ -43,7 +43,7 @@ docker info >/dev/null 2>&1 || die "Este usuario no puede usar Docker (¿está e
 getv() { grep -E "^$1=" "$DIR/.env" | tail -n1 | cut -d= -f2- || true; }
 setv() {
   local k="$1" v="$2" f="$DIR/.env"
-  awk -v k="$k" -v v="$v" 'BEGIN{FS=OFS="="} $1==k{print k"="v; next} {print}' "$f" > "$f.tmp" \
+  awk -v k="$k" -v v="$v" 'BEGIN{FS=OFS="="} $1==k{print k"="v; s=1; next} {print} END{if(!s) print k"="v}' "$f" > "$f.tmp" \
     && cat "$f.tmp" > "$f" && rm -f "$f.tmp"   # cat > conserva permisos y dueño de .env
 }
 
@@ -52,8 +52,18 @@ NAME="$(getv COMPOSE_PROJECT_NAME)"; OLD="$(getv PRIME_VERSION)"; PORT="$(getv A
 cd "$DIR"
 info "Instalación $NAME: $OLD → $VERSION"
 
+# Imagen: si el paquete trae otra (p. ej. porque el repo cambió de dueño), se adopta.
+OLD_IMAGE="$(getv PRIME_IMAGE)"; IMAGE="$OLD_IMAGE"
+if [[ -n "$FROM_PKG" ]]; then
+  PKG_IMAGE="$(grep -E '^PRIME_IMAGE=' "$PKG/.env.example" 2>/dev/null | cut -d= -f2- || true)"
+  if [[ -n "$PKG_IMAGE" && "$PKG_IMAGE" != "$OLD_IMAGE" ]]; then
+    IMAGE="$PKG_IMAGE"
+    info "Imagen: ${OLD_IMAGE:-(por defecto)} → $IMAGE"
+  fi
+fi
+
 # ─── 1. Descargar la versión nueva (sin tocar nada todavía) ──────────────────
-PRIME_VERSION="$VERSION" docker compose pull app \
+PRIME_IMAGE="$IMAGE" PRIME_VERSION="$VERSION" docker compose pull app \
   || die "No se pudo descargar la versión $VERSION. No se ha cambiado nada."
 ok "Imagen $VERSION descargada"
 
@@ -82,6 +92,7 @@ fi
 
 # ─── 4. Cambiar de versión y reiniciar ───────────────────────────────────────
 setv PRIME_VERSION "$VERSION"
+if [[ "$IMAGE" != "$OLD_IMAGE" ]]; then setv PRIME_IMAGE "$IMAGE"; fi
 docker compose up -d
 health() {
   for _ in $(seq 1 40); do
@@ -104,6 +115,7 @@ fi
 docker compose logs --tail=60 app || true
 warn "La versión $VERSION no responde. Volviendo a $OLD…"
 setv PRIME_VERSION "$OLD"
+if [[ "$IMAGE" != "$OLD_IMAGE" ]]; then setv PRIME_IMAGE "$OLD_IMAGE"; fi
 if [[ -n "$FROM_PKG" ]]; then
   for f in "$DIR"/.previous/*; do if [[ -f "$f" ]]; then cp -p "$f" "$DIR/$(basename "$f")"; fi; done
 fi

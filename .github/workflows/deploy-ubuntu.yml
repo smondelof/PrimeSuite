@@ -22,7 +22,7 @@ permissions:
 jobs:
   deploy:
     # Solo en el repo original (nunca en forks) y solo en el runner del servidor.
-    if: github.repository_owner == 'marcriera-cmd'
+    if: github.repository_owner == 'smondelof'
     runs-on: [self-hosted, linux, primesuite]
     timeout-minutes: 30
     steps:

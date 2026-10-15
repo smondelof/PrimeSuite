@@ -1,7 +1,7 @@
 # Prime Suite · paquete de instalación
 
 Este paquete instala Prime Suite a partir de la imagen publicada en
-`ghcr.io/marcriera-cmd/primesuite`, sin compilar nada en el servidor. La versión
+`ghcr.io/smondelof/primesuite`, sin compilar nada en el servidor. La versión
 del paquete está en el fichero `VERSION`.
 
 ## Requisitos

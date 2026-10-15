@@ -15,7 +15,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
-REPO_URL="${REPO_URL:-https://github.com/marcriera-cmd/PrimeSuite}"
+REPO_URL="${REPO_URL:-https://github.com/smondelof/PrimeSuite}"
 RUNNER_USER="${RUNNER_USER:-gh-runner}"
 RUNNER_DIR="${RUNNER_DIR:-/opt/actions-runner}"
 RUNNER_NAME="${RUNNER_NAME:-$(hostname)-primesuite}"
