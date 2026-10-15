@@ -36,7 +36,7 @@ jobs:
           npm run typecheck > ../ci-out/typecheck.txt 2>&1; echo "exit=$?" >> ../ci-out/typecheck.txt
           npm test > ../ci-out/test.txt 2>&1; echo "exit=$?" >> ../ci-out/test.txt
           npm run build > ../ci-out/build.txt 2>&1; echo "exit=$?" >> ../ci-out/build.txt
-          node --import tsx ../ci/sqlserver-it.ts > ../ci-out/integracion.txt 2>&1; echo "exit=$?" >> ../ci-out/integracion.txt
+          node --import tsx ../ci/sqlserver-it.mts > ../ci-out/integracion.txt 2>&1; echo "exit=$?" >> ../ci-out/integracion.txt
           cd ..
           docker build -q prime-suite > ci-out/docker.txt 2>&1; echo "exit=$?" >> ci-out/docker.txt
           git config user.name "ci" && git config user.email "ci@example.invalid"
