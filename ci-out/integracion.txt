@@ -1,0 +1,31 @@
+
+══════════════════════════════════════════════════════════════════
+  Prime Suite necesita los datos de conexión a SQL Server.
+  Ábrelo en el navegador y rellena el formulario. Código de configuración:
+      JZHN2-KDTXZ
+  (también en /tmp/ps-it-jEAZk1/codigo-configuracion.txt)
+══════════════════════════════════════════════════════════════════
+
+código JZHN2-KDTXZ
+(node:3218) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+errores de credenciales OK: Usuario o contraseña de SQL Server incorrectos.
+[prime-suite] Migración SQLite → SQL Server: 10 de 10 registros copiados (/tmp/ps-it-jEAZk1/prime-suite.db).
+[prime-suite] Conectado a SQL Server localhost/PrimeSuiteCI.
+configureDb → {"ok":true,"createdDatabase":true,"migrated":{"total":10,"inserted":10},"status":{"store":"sqlserver","status":"lista","ready":true,"error":null,"since":"2026-10-15T13:35:12.933Z","configured":true,"config":null}}
+KV OK
+columnas [{"TABLE_NAME":"PrimeSuite_Datos","COLUMN_NAME":"Clave","COLLATION_NAME":"Latin1_General_100_BIN2"},{"TABLE_NAME":"PrimeSuite_Datos","COLUMN_NAME":"Valor","COLLATION_NAME":"SQL_Latin1_General_CP1_CI_AS"},{"TABLE_NAME":"PrimeSuite_Datos","COLUMN_NAME":"Ambito","COLLATION_NAME":"Latin1_General_100_BIN2"},{"TABLE_NAME":"PrimeSuite_Datos","COLUMN_NAME":"Creado","COLLATION_NAME":null},{"TABLE_NAME":"PrimeSuite_Datos","COLUMN_NAME":"Actualizado","COLLATION_NAME":null},{"TABLE_NAME":"PrimeSuite_Info","COLUMN_NAME":"Clave","COLLATION_NAME":"SQL_Latin1_General_CP1_CI_AS"},{"TABLE_NAME":"PrimeSuite_Info","COLUMN_NAME":"Valor","COLLATION_NAME":"SQL_Latin1_General_CP1_CI_AS"},{"TABLE_NAME":"PrimeSuite_Info","COLUMN_NAME":"Actualizado","COLLATION_NAME":null}]
+ámbitos [{"Ambito":"a_b","n":1},{"Ambito":"audit","n":2},{"Ambito":"axb","n":1},{"Ambito":"codes","n":1},{"Ambito":"companies","n":1},{"Ambito":"conc","n":1},{"Ambito":"jti","n":2},{"Ambito":"once","n":1},{"Ambito":"settings","n":1},{"Ambito":"users","n":1}]
+health servidor con fichero {"ok":true,"service":"prime-suite","version":"desarrollo","store":"sqlserver","db":"lista"}
+/api/setup/status con datos migrados 200 {"needsSetup":false}
+/api/me sin BD 503 {"error":"Prime Suite aún no tiene configurada la base de datos SQL Server.","code":"DB_SETUP"}
+/.well-known sin BD 503
+/api/db/status {"store":"sqlserver","status":"sin-configurar","ready":false,"error":null,"since":"2026-10-15T13:35:15.207Z","configured":false,"config":null,"configFile":"/tmp/ps-it2-FtvooY/sqlserver.json","sqlite":{"file":"/tmp/ps-it2-FtvooY/prime-suite.db","exists":false,"migrated":false}}
+/api/db/config 200 {"ok":true,"createdDatabase":true,"migrated":null,"status":{"store":"sqlserver","status":"lista","ready":true,"error":null,"since":"2026-10-15T13:35:15.813Z","configured":true,"config":null}}
+/api/setup/status tras configurar 200 {"needsSetup":true}
+[prime-suite] Conectado a SQL Server localhost/PrimeSuiteCI.
+Copia de seguridad: 12 registros → /tmp/ps-it-jEAZk1/b.json
+backup 12 registros en 659 ms
+
+INTEGRACIÓN SQL SERVER: TODO OK
+exit=0
