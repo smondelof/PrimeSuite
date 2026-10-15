@@ -1,0 +1,26 @@
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+Error: Transform failed with 43 errors:
+/home/runner/work/PrimeSuite/PrimeSuite/ci/sqlserver-it.ts:36:11: ERROR: Top-level await is currently not supported with the "cjs" output format
+/home/runner/work/PrimeSuite/PrimeSuite/ci/sqlserver-it.ts:37:18: ERROR: Top-level await is currently not supported with the "cjs" output format
+/home/runner/work/PrimeSuite/PrimeSuite/ci/sqlserver-it.ts:40:0: ERROR: Top-level await is currently not supported with the "cjs" output format
+/home/runner/work/PrimeSuite/PrimeSuite/ci/sqlserver-it.ts:46:0: ERROR: Top-level await is currently not supported with the "cjs" output format
+/home/runner/work/PrimeSuite/PrimeSuite/ci/sqlserver-it.ts:47:0: ERROR: Top-level await is currently not supported with the "cjs" output format
+...
+    at failureErrorWithLog (/home/runner/work/PrimeSuite/PrimeSuite/prime-suite/node_modules/esbuild/lib/main.js:1752:15)
+    at /home/runner/work/PrimeSuite/PrimeSuite/prime-suite/node_modules/esbuild/lib/main.js:1019:50
+    at responseCallbacks.<computed> (/home/runner/work/PrimeSuite/PrimeSuite/prime-suite/node_modules/esbuild/lib/main.js:886:9)
+    at handleIncomingPacket (/home/runner/work/PrimeSuite/PrimeSuite/prime-suite/node_modules/esbuild/lib/main.js:941:12)
+    at Socket.readFromStdout (/home/runner/work/PrimeSuite/PrimeSuite/prime-suite/node_modules/esbuild/lib/main.js:864:7)
+    at Socket.emit (node:events:519:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23) {
+  name: 'TransformError'
+}
+
+Node.js v22.23.3
+exit=1
