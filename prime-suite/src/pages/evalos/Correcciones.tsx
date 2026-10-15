@@ -430,17 +430,9 @@ function MarcajesRest({ employees, lookups, canEdit, canDelete }: { employees: E
 /** Incidencia de los marcajes normales: no está en la tabla INCIDENC y va siempre la primera. */
 const NORMAL_INC: EvalosIncidencia = { code: '000', name: 'Entrada / Salida' };
 let incidenciasCache: Promise<EvalosIncidencia[]> | null = null;
-const vacacionesCache = new Map<string, Promise<EvalosIncidencia[]>>();
+let vacacionesCache: Promise<EvalosIncidencia[]> | null = null;
 /** Tipos de vacaciones (TIPOSVACACIONES). */
-/** Tipos de vacaciones con periodo vigente hoy para el empleado (se guardan por empleado mientras dura la pantalla). */
-const loadTiposVacaciones = (employee: string) => {
-  let p = vacacionesCache.get(employee);
-  if (!p) {
-    p = api.get<{ items: EvalosIncidencia[] }>(`/api/evalos/correcciones/tiposvacaciones?employee=${encodeURIComponent(employee)}`).then((r) => r.items).catch((e) => { vacacionesCache.delete(employee); throw e; });
-    vacacionesCache.set(employee, p);
-  }
-  return p;
-};
+const loadTiposVacaciones = () => (vacacionesCache ||= api.get<{ items: EvalosIncidencia[] }>('/api/evalos/correcciones/tiposvacaciones').then((r) => r.items).catch((e) => { vacacionesCache = null; throw e; }));
 let ausenciasCache: Promise<EvalosIncidencia[]> | null = null;
 /** Incidencias de tipo A (absentismos) de INCIDENC, para asignar ausencias. */
 const loadIncidenciasAusencia = () => (ausenciasCache ||= api.get<{ items: EvalosIncidencia[] }>('/api/evalos/correcciones/incidencias?tipo=A').then((r) => r.items).catch((e) => { ausenciasCache = null; throw e; }));
@@ -609,7 +601,7 @@ function VacacionesDia({ marcaje, onSaved }: { marcaje: EvalosRestMarcaje; onSav
   const [type, setType] = useState(current);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
-  useEffect(() => { loadTiposVacaciones(marcaje.employee).then(setList, (e) => setErr(e.message)); }, [marcaje.employee]);
+  useEffect(() => { loadTiposVacaciones().then(setList, (e) => setErr(e.message)); }, []);
   const nameOf = (code: string) => list?.find((x) => x.code === code)?.name || code;
   const changed = type !== current;
 
@@ -632,7 +624,6 @@ function VacacionesDia({ marcaje, onSaved }: { marcaje: EvalosRestMarcaje; onSav
     <div className="col" style={{ gap: 8, borderTop: '1px solid var(--line-2)', paddingTop: 12 }}>
       <b className="small">Vacaciones · {fmtDate(marcaje.date)}</b>
       {err && <div className="alert warn xs">No se pudo leer los tipos de vacaciones (TIPOSVACACIONES): {err}</div>}
-      {list && !list.length && !err && <span className="xs muted">El empleado no tiene ningún periodo de vacaciones vigente hoy.</span>}
       <div className="row wrap" style={{ gap: 8 }}>
         <select className="select grow" style={{ minWidth: 180 }} value={type} onChange={(e) => setType(e.target.value)} disabled={!list && !current} aria-label="Vacaciones del día">
           <option value="">{list || current ? '— Sin vacaciones —' : 'Cargando…'}</option>

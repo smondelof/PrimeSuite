@@ -954,20 +954,12 @@ export function evalosRoutes(r: Router) {
   });
   // Ausencia del día seleccionado (absentismo de fichero, PUT /Absence con desde = hasta = ese día).
   // --- Vacaciones del día (servicios SOAP de Evalos) ---
-  // Tipos de vacaciones (TIPOSVACACIONES de la BD) para el combo. Con ?employee=, solo los tipos en los que el
-  // empleado tiene un periodo de vacaciones (tabla VACACIONES) vigente hoy.
+  // Tipos de vacaciones (TIPOSVACACIONES de la BD) para el combo.
   r.get('/api/evalos/correcciones/tiposvacaciones', async (req) => {
     const { c } = await requireEvalos(req);
     const { driver } = await driverFor(c.company.id);
     const labels = driver.dayLabels ? await driver.dayLabels() : null;
-    let items = (labels?.holidays || []).map(({ code, name }) => ({ code, name })).sort((a, b) => a.code.localeCompare(b.code));
-    const employee = cleanEmployeeCode(new URL(req.url).searchParams.get('employee') || '');
-    if (employee && driver.listEmployeePeriods) {
-      const today = todayIso();
-      const { vacations } = await driver.listEmployeePeriods([employee], today);
-      const open = new Set(vacations.filter((v) => v.employee === employee && v.from <= today && (!v.to || v.to >= today)).map((v) => v.type.toUpperCase()));
-      items = items.filter((x) => open.has(x.code.toUpperCase()));
-    }
+    const items = (labels?.holidays || []).map(({ code, name }) => ({ code, name })).sort((a, b) => a.code.localeCompare(b.code));
     return json({ items }, 200, { 'cache-control': 'no-store' });
   });
   // Asignar (o cambiar) las vacaciones del día: AsignarDiaVacaciones; si ya tenía otro tipo, antes BorrarVacaciones.
