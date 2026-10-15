@@ -9,6 +9,8 @@ export interface DbStatus {
   ready: boolean;
   error: string | null;
   configured?: boolean;
+  suggestedDatabase?: string;
+  installation?: string;
   config?: { server: string; port: number | null; database: string; encrypt: boolean; trustServerCertificate: boolean } | null;
   configFile?: string;
   sqlite?: { file: string; exists: boolean; migrated: boolean };
@@ -53,7 +55,7 @@ function DbSetup({ status, onDone, onRefresh }: { status: DbStatus; onDone: () =
     code: '',
     server: c?.server || '',
     port: c?.port ? String(c.port) : '1433',
-    database: c?.database || 'PrimeSuite',
+    database: c?.database || '',
     user: '',
     password: '',
     encrypt: c ? c.encrypt : true,
@@ -62,6 +64,8 @@ function DbSetup({ status, onDone, onRefresh }: { status: DbStatus; onDone: () =
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<'' | 'save' | 'retry'>('');
   const [done, setDone] = useState<string | null>(null);
+  const [inUse, setInUse] = useState(false);
+  const [takeOver, setTakeOver] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
   const named = f.server.includes('\\');
@@ -73,7 +77,8 @@ function DbSetup({ status, onDone, onRefresh }: { status: DbStatus; onDone: () =
     try {
       const r = await api.post<{ createdDatabase: boolean; migrated: { total: number; inserted: number } | null }>('/api/db/config', {
         ...f,
-        port: named ? undefined : f.port
+        port: named ? undefined : f.port,
+        takeOver: inUse && takeOver
       });
       const parts = ['Conexión guardada.'];
       if (r.createdDatabase) parts.push(`Se ha creado la base de datos ${f.database}.`);
@@ -83,6 +88,7 @@ function DbSetup({ status, onDone, onRefresh }: { status: DbStatus; onDone: () =
       setTimeout(onDone, 2500);
     } catch (err: any) {
       setError(err.message);
+      if (err.code === 'DB_IN_USE') setInUse(true);
       setBusy('');
     }
   }
@@ -140,8 +146,9 @@ function DbSetup({ status, onDone, onRefresh }: { status: DbStatus; onDone: () =
           <label className="field">Puerto<span className="hint">{named ? 'No se usa con instancia con nombre' : 'Normalmente 1433'}</span>
             <input className="input mono" value={named ? '' : f.port} onChange={set('port')} inputMode="numeric" disabled={named} />
           </label>
-          <label className="field">Base de datos<span className="hint">Se crea si no existe</span>
-            <input className="input mono" value={f.database} onChange={set('database')} required />
+          <label className="field">Base de datos<span className="hint">Una distinta por entorno · se crea si no existe</span>
+            <input className="input mono" value={f.database} onChange={(e) => { set('database')(e); setInUse(false); setTakeOver(false); }}
+              placeholder={status.suggestedDatabase ? `p. ej. ${status.suggestedDatabase}` : 'p. ej. PrimeSuite_Dev'} required />
           </label>
           <span />
           <label className="field">Usuario<input className="input" value={f.user} onChange={set('user')} autoComplete="off" required /></label>
@@ -153,7 +160,17 @@ function DbSetup({ status, onDone, onRefresh }: { status: DbStatus; onDone: () =
         {status.sqlite?.exists && !status.sqlite.migrated && (
           <div className="alert info small">Al conectar se copiarán a SQL Server todos los datos actuales de Prime Suite (fichero SQLite). No se sobrescribe nada que ya exista en la base de datos.</div>
         )}
-        <div className="alert info small">Usa una base de datos distinta para cada entorno (desarrollo y producción).</div>
+        <div className="alert info small">
+          Desarrollo y producción pueden usar el mismo servidor, pero cada uno con <b>su propia base de datos</b>.
+          Si eliges una que ya usa otra instalación de Prime Suite, se avisa y no se conecta.
+          {status.installation && <> Esta instalación: <span className="mono">{status.installation}</span>.</>}
+        </div>
+        {inUse && (
+          <label className="check" style={{ alignItems: 'flex-start' }}>
+            <input type="checkbox" checked={takeOver} onChange={(e) => setTakeOver(e.target.checked)} />
+            <span>Es la base de datos de <b>esta misma</b> instalación (p. ej. tras reinstalarla): usarla igualmente. La otra instalación dejará de poder conectarse a ella.</span>
+          </label>
+        )}
 
         <button className="btn primary" disabled={!!busy || !!done}>{busy === 'save' ? 'Conectando y creando tablas…' : 'Guardar y conectar'}</button>
       </form>

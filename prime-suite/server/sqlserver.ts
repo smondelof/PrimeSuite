@@ -7,7 +7,8 @@
 // · La primera vez migra todo lo que había en el fichero SQLite anterior (sin sobrescribir nada).
 // · Para cambiar la conexión desde la web hace falta el código de configuración que se escribe en el
 //   log del contenedor y en /data/codigo-configuracion.txt (así nadie de fuera puede apuntar la app a otro servidor).
-import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { hostname } from 'node:os';
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -140,6 +141,7 @@ export function normalizeInput(b: DbInput, previous?: DbConfig | null) {
   if (port !== undefined && (!Number.isInteger(port) || port < 1 || port > 65535)) throw new HttpError(400, 'El puerto no es válido.');
   if (!database) throw new HttpError(400, 'Indica la base de datos.');
   if (/[\[\]\x00-\x1f]/.test(database)) throw new HttpError(400, 'El nombre de la base de datos no es válido.');
+  if (['master', 'model', 'msdb', 'tempdb'].includes(database.toLowerCase())) throw new HttpError(400, 'No uses una base de datos del sistema: indica una propia para Prime Suite (p. ej. PrimeSuite_Dev).');
   if (!user) throw new HttpError(400, 'Indica el usuario de SQL Server.');
   let password = typeof b.password === 'string' ? b.password : '';
   // Contraseña vacía = mantener la guardada (si es el mismo servidor y usuario).
@@ -279,6 +281,48 @@ async function migrateFromSqlite(pool: import('mssql').ConnectionPool, c: Conn):
   return { total: rows.length, inserted };
 }
 
+// ---------- Instalación dueña de la base de datos ----------
+// Desarrollo y producción pueden usar el mismo servidor SQL Server: cada instalación se identifica con un
+// id guardado en su volumen (/data/.instalacion) y marca su base de datos con él. Así, si dos instalaciones
+// apuntan por error a la misma base de datos, la segunda no entra y no se pisan los datos.
+interface Installation { id: string; name: string; at: string }
+const installPath = () => path.join(dataDir(), '.instalacion');
+export function installName() {
+  return (process.env.PRIME_INSTALL_NAME || process.env.COMPOSE_PROJECT_NAME || process.env.PRIME_ISSUER || '').trim() || hostname();
+}
+export function installation(): Installation {
+  try {
+    const i = JSON.parse(readFileSync(installPath(), 'utf8')) as Installation;
+    if (i?.id) return i;
+  } catch {}
+  const i: Installation = { id: randomUUID(), name: installName(), at: new Date().toISOString() };
+  writePrivate(installPath(), JSON.stringify(i) + '\n');
+  return i;
+}
+/** Nombre de base de datos que se sugiere en el formulario (distinto en producción). */
+export function suggestedDatabase() {
+  if (process.env.PRIME_DB_NAME) return process.env.PRIME_DB_NAME;
+  const n = installName().toLowerCase();
+  return /prod/.test(n) ? 'PrimeSuite_Prod' : 'PrimeSuite_Dev';
+}
+
+async function claimDatabase(pool: import('mssql').ConnectionPool, database: string, takeOver: boolean) {
+  const sql = await mssql();
+  const me = installation();
+  const r = await pool.request().input('k', sql.NVarChar(100), 'instalacion').query(`SELECT Valor FROM ${INFO_TABLE} WHERE Clave = @k`);
+  let owner: Installation | null = null;
+  try { owner = r.recordset[0]?.Valor ? JSON.parse(r.recordset[0].Valor) : null; } catch {}
+  if (owner?.id === me.id) return;
+  if (owner?.id && !takeOver) {
+    const since = owner.at ? new Date(owner.at).toLocaleDateString('es-ES') : '?';
+    throw new HttpError(409, `La base de datos "${database}" ya la usa otra instalación de Prime Suite (${owner.name || 'sin nombre'}, desde el ${since}). Indica otro nombre de base de datos para que no se pisen los datos.`, 'DB_IN_USE');
+  }
+  const v = JSON.stringify({ ...me, name: installName(), at: new Date().toISOString(), previous: owner?.id ? owner : undefined });
+  await pool.request().input('k', sql.NVarChar(100), 'instalacion').input('v', sql.NVarChar(sql.MAX), v)
+    .query(`UPDATE ${INFO_TABLE} SET Valor = @v, Actualizado = SYSUTCDATETIME() WHERE Clave = @k;
+            IF @@ROWCOUNT = 0 INSERT INTO ${INFO_TABLE} (Clave, Valor) VALUES (@k, @v);`);
+}
+
 // ---------- Estado ----------
 export type DbStatus = 'iniciando' | 'conectando' | 'sin-configurar' | 'error' | 'lista';
 interface State { status: DbStatus; error?: string; since: string; pool?: import('mssql').ConnectionPool; config?: DbConfig }
@@ -324,11 +368,12 @@ function normalizeConfig(cfg: DbConfig): Conn {
   return { server: cfg.server, port: cfg.port, database: cfg.database, user: cfg.user, password: decryptLocal(cfg.passwordEnc), encrypt: cfg.encrypt, trustServerCertificate: cfg.trustServerCertificate };
 }
 
-async function activate(c: Conn, cfg: DbConfig) {
+async function activate(c: Conn, cfg: DbConfig, takeOver = false) {
   const { pool, createdDatabase } = await openPool(c);
   pool.on('error', (e: any) => { if (state.pool === pool) lost(e); });
   try {
     await ensureSchema(pool);
+    await claimDatabase(pool, c.database, takeOver);
     const migrated = await migrateFromSqlite(pool, c);
     const old = state.pool;
     state.pool = pool;
@@ -398,6 +443,8 @@ export function dbStatus() {
     error: state.error || null,
     since: state.since,
     configured: !!c,
+    suggestedDatabase: state.status !== 'lista' ? suggestedDatabase() : undefined,
+    installation: state.status !== 'lista' ? installName() : undefined,
     // Datos para rellenar el formulario (sin usuario ni contraseña). Solo mientras no está conectada.
     config: state.status !== 'lista' && c ? { server: c.server, port: c.port || null, database: c.database, encrypt: c.encrypt, trustServerCertificate: c.trustServerCertificate } : null,
     configFile: state.status !== 'lista' ? configPath() : undefined,
@@ -415,7 +462,7 @@ export async function retryDb() {
 }
 
 /** Guarda una conexión nueva: prueba, crea BD/tablas, migra el SQLite y escribe el fichero. */
-export async function configureDb(b: DbInput & { code?: string }) {
+export async function configureDb(b: DbInput & { code?: string; takeOver?: boolean }) {
   if (state.status === 'lista') throw new HttpError(409, 'La base de datos ya está conectada. Para cambiarla, edita o borra el fichero de configuración y reinicia.');
   checkCode(b.code);
   const c = normalizeInput(b, readConfig());
@@ -426,11 +473,12 @@ export async function configureDb(b: DbInput & { code?: string }) {
   if (connecting) await connecting.catch(() => {});
   setStatus('conectando');
   try {
-    const r = await activate(c, cfg);
+    const r = await activate(c, cfg, b.takeOver === true);
     writeConfig(cfg);
     return { ok: true, createdDatabase: r.createdDatabase, migrated: r.migrated, status: dbStatus() };
   } catch (e) {
     setStatus(readConfig() ? 'error' : 'sin-configurar', explain(e));
+    if (e instanceof HttpError) throw e;
     throw new HttpError(400, explain(e));
   }
 }

@@ -87,3 +87,17 @@ test('el esquema es idempotente y usa intercalación binaria en la clave', () =>
   assert.match(all, /Latin1_General_100_BIN2/);
   for (const stmt of db.SCHEMA_SQL) assert.match(stmt.trim(), /^IF /);
 });
+
+test('no se admiten bases de datos del sistema', () => {
+  for (const d of ['master', 'MSDB', 'tempdb', 'model']) assert.throws(() => db.normalizeInput({ server: 'h', database: d, user: 'u', password: 'p' }), /sistema/);
+});
+
+test('cada instalación tiene un id estable y un nombre de BD sugerido distinto en producción', () => {
+  const a = db.installation();
+  assert.equal(db.installation().id, a.id);
+  process.env.COMPOSE_PROJECT_NAME = 'primesuite-prod';
+  assert.equal(db.suggestedDatabase(), 'PrimeSuite_Prod');
+  process.env.COMPOSE_PROJECT_NAME = 'deploy';
+  assert.equal(db.suggestedDatabase(), 'PrimeSuite_Dev');
+  delete process.env.COMPOSE_PROJECT_NAME;
+});
