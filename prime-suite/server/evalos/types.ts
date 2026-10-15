@@ -135,7 +135,7 @@ export interface IncidenceLimitRow { employee: string; incidence: string; from: 
 /** Clave de un periodo grabado (persona + tipo de vacaciones o incidencia + FECHAINICIO). */
 export interface PeriodKey { employee: string; code: string; from: string }
 /** Periodo ya grabado, con lo disfrutado (DIASASIGNADOS, HORASASIGNADAS / VALOR). */
-export interface StoredVacationPeriod extends VacationPeriodRow { assignedDays: number; assignedHours: number }
+export interface StoredVacationPeriod extends VacationPeriodRow { assignedDays: number; assignedHours: number; /** D = periodo en días, H = en horas (PERIODOENDIAS = 0). */ unit?: 'D' | 'H' }
 export interface StoredIncidenceLimit extends IncidenceLimitRow { used: number }
 
 /** Tipo de vacaciones de Evalos 8 (tabla TIPOSVACACIONES). */
