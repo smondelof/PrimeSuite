@@ -7,6 +7,17 @@ import { ModulesProvider, useModules } from '../modules';
 import ModuleHost from './ModuleHost';
 import { useNavGroup } from './navGroups';
 
+/** Versión publicada (de /api/health); «desarrollo» en el entorno de desarrollo. */
+let versionCache: Promise<string | null> | null = null;
+function useVersion() {
+  const [v, setV] = useState<string | null>(null);
+  useEffect(() => {
+    versionCache ||= api.get<{ version?: string }>('/api/health').then((h) => h.version || null).catch(() => { versionCache = null; return null; });
+    versionCache.then(setV);
+  }, []);
+  return v;
+}
+
 /** Icono de cada categoría de aplicaciones (por nombre; si no se reconoce, una etiqueta). */
 function CatIcon({ name }: { name: string }) {
   const n = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -34,6 +45,7 @@ const NAV_KEY = 'ps.nav.open';
 
 function Shell() {
   const { me, logout } = useSession();
+  const version = useVersion();
   const nav = useNavigate();
   const loc = useLocation();
   const { setOnNative } = useModules();
@@ -77,7 +89,10 @@ function Shell() {
       <aside className="side">
         <div className="brand">
           <LogoMark size={22} color="currentColor" />
-          <span className="brand-name">Prime Suite</span>
+          <span className="brand-text">
+            <span className="brand-name">Prime Suite</span>
+            {version && <span className="brand-version" title="Versión de Prime Suite">{version === 'desarrollo' ? 'Desarrollo' : `Versión ${version}`}</span>}
+          </span>
           <button className="icon-btn side-collapse" title="Ocultar menú" aria-label="Ocultar menú" onClick={toggleNav}>
             <Icon.panel />
           </button>

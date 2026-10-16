@@ -54,6 +54,8 @@ h3 { font-size: 15px; font-weight: 700; }
 .brand { display: flex; align-items: center; gap: 9px; padding: 6px 10px; color: #fff; }
 .brand-suite { font-size: 15px; font-weight: 600; color: #fff; opacity: .72; letter-spacing: .01em; }
 .brand-name { font-size: 17px; font-weight: 700; color: #fff; letter-spacing: .01em; white-space: nowrap; }
+.brand-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.brand-version { font-size: 11px; font-weight: 500; color: #fff; opacity: .6; letter-spacing: .02em; white-space: nowrap; }
 .brand b { font-size: 16px; }
 .brand small { display: block; font-size: 11px; color: #9C98A6; }
 .nav { display: flex; flex-direction: column; gap: 2px; }
