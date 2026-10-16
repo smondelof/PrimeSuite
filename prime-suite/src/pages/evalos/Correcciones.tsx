@@ -601,7 +601,8 @@ function AusenciaDia({ marcaje, onSaved }: { marcaje: EvalosRestMarcaje; onSaved
 }
 
 /**
- * Vacaciones del día seleccionado, como la ausencia: el combo muestra el tipo que ya tiene; se asigna o cambia
+ * Vacaciones del día seleccionado, como la ausencia: el combo muestra el tipo que ya tiene y solo los tipos de los
+ * periodos de VACACIONES vigentes ese día; se asigna o cambia
  * (SOAP AsignarDiaVacaciones) o se quita eligiendo «Sin vacaciones» (SOAP BorrarVacaciones).
  */
 function VacacionesDia({ marcaje, onSaved }: { marcaje: EvalosRestMarcaje; onSaved: () => void }) {
@@ -611,15 +612,20 @@ function VacacionesDia({ marcaje, onSaved }: { marcaje: EvalosRestMarcaje; onSav
   const [type, setType] = useState(current);
   const [hours, setHours] = useState('');
   const [busy, setBusy] = useState(false);
-  // Periodos del empleado que incluyen el día: si el del tipo elegido es en horas, se piden horas (AsignarHorasVacaciones).
-  const [periods, setPeriods] = useState<{ type: string; unit: 'D' | 'H'; minutesPerDay?: number | null }[]>([]);
+  // Periodos del empleado que incluyen el día (VACACIONES): solo se ofrecen esos tipos. Si el del tipo elegido es en
+  // horas, se piden horas (AsignarHorasVacaciones). null = cargando; periodsErr = no se han podido leer (se ofrecen todos).
+  const [periods, setPeriods] = useState<{ type: string; unit: 'D' | 'H'; minutesPerDay?: number | null }[] | null>(null);
+  const [periodsErr, setPeriodsErr] = useState<string | null>(null);
   const toast = useToast();
   useEffect(() => { loadTiposVacaciones().then(setList, (e) => setErr(e.message)); }, []);
   useEffect(() => {
     api.get<{ items: { type: string; unit: 'D' | 'H'; minutesPerDay?: number | null }[] }>(`/api/evalos/correcciones/periodosvacaciones?employee=${encodeURIComponent(marcaje.employee)}&date=${marcaje.date}`)
-      .then((r) => setPeriods(r.items), () => setPeriods([]));
+      .then((r) => { setPeriods(r.items); setPeriodsErr(null); }, (e) => { setPeriods([]); setPeriodsErr(e.message || 'Error'); });
   }, [marcaje.employee, marcaje.date]);
-  const periodOf = (code: string) => periods.find((p) => p.type.toUpperCase() === code.toUpperCase());
+  const periodOf = (code: string) => (periods || []).find((p) => p.type.toUpperCase() === code.toUpperCase());
+  // Tipos que se ofrecen: los de los periodos vigentes ese día (y el que ya tiene asignado, para poder verlo o quitarlo).
+  const options = periodsErr ? list : list && periods ? list.filter((x) => periodOf(x.code) || x.code === current) : null;
+  const noPeriods = !!periods && !periodsErr && !periods.length;
   const unitOf = (code: string) => periodOf(code)?.unit;
   const inHours = !!type && unitOf(type) === 'H';
   // Periodo en horas: se proponen las horas de un día de vacaciones del periodo (MINUTOSDIA); se pueden cambiar.
@@ -650,10 +656,10 @@ function VacacionesDia({ marcaje, onSaved }: { marcaje: EvalosRestMarcaje; onSav
       <b className="small">Vacaciones · {fmtDate(marcaje.date)}</b>
       {err && <div className="alert warn xs">No se pudo leer los tipos de vacaciones (TIPOSVACACIONES): {err}</div>}
       <div className="row wrap" style={{ gap: 8 }}>
-        <select className="select grow" style={{ minWidth: 180 }} value={type} onChange={(e) => setType(e.target.value)} disabled={!list && !current} aria-label="Vacaciones del día">
-          <option value="">{list || current ? '— Sin vacaciones —' : 'Cargando…'}</option>
-          {current && !list?.some((x) => x.code === current) && <option value={current}>{current}</option>}
-          {list?.map((x) => <option key={x.code} value={x.code}>{x.name || x.code}{unitOf(x.code) === 'H' ? ' (en horas)' : ''}</option>)}
+        <select className="select grow" style={{ minWidth: 180 }} value={type} onChange={(e) => setType(e.target.value)} disabled={!options && !current} aria-label="Vacaciones del día">
+          <option value="">{options || current ? '— Sin vacaciones —' : 'Cargando…'}</option>
+          {current && !options?.some((x) => x.code === current) && <option value={current}>{current}</option>}
+          {options?.map((x) => <option key={x.code} value={x.code}>{x.name || x.code}{unitOf(x.code) === 'H' ? ' (en horas)' : ''}</option>)}
         </select>
         {inHours && changed && (
           <label className="field" style={{ margin: 0, width: 150 }} title="El periodo de este tipo de vacaciones está en horas: indica cuántas horas se asignan este día">
@@ -665,6 +671,10 @@ function VacacionesDia({ marcaje, onSaved }: { marcaje: EvalosRestMarcaje; onSav
           {busy ? 'Guardando…' : !changed ? (current ? 'Vacaciones asignadas' : 'Asignar vacaciones') : type ? (inHours ? 'Asignar horas' : current ? 'Cambiar vacaciones' : 'Asignar vacaciones') : 'Quitar vacaciones'}
         </button>
       </div>
+      {noPeriods && list && (
+        <span className="xs muted">No tiene ningún periodo de vacaciones vigente el {fmtDate(marcaje.date)} (VACACIONES): genera sus periodos desde Convenios.</span>
+      )}
+      {periodsErr && <span className="xs muted">No se han podido leer sus periodos de vacaciones ({periodsErr}): se muestran todos los tipos.</span>}
       {inHours && changed && (
         <span className="xs muted">
           Periodo en horas: se asignan las horas indicadas (HH:MM).{dayHours ? ` Un día de vacaciones de este periodo son ${dayHours} h.` : ''}
