@@ -135,7 +135,7 @@ function seed(): DemoData {
   });
 
   const convenios: Convenio[] = [
-    { code: 'OFI', name: 'CONVENIO OFICINAS', vacations: [{ type: 'AP', day: 1, month: 1, unit: 'H', days: 0, minutes: 16 * 60 }, { type: 'V26', day: 1, month: 1, days: 23, pluses: [{ years: 5, value: 1 }, { years: 10, value: 2 }] }], incidenceDay: 1, incidenceMonth: 1,
+    { code: 'OFI', name: 'CONVENIO OFICINAS', vacations: [{ type: 'AP', day: 1, month: 1, unit: 'H', days: 0, minutes: 16 * 60, minutesPerDay: 480 }, { type: 'V26', day: 1, month: 1, days: 23, pluses: [{ years: 5, value: 1 }, { years: 10, value: 2 }] }], incidenceDay: 1, incidenceMonth: 1,
       limits: [{ incidence: '001', unit: 'H', value: 24 * 60 }, { incidence: '003', unit: 'H', value: 20 * 60 }, { incidence: '007', unit: 'H', value: 8 * 60 }] },
     { code: 'PROD', name: 'CONVENIO PRODUCCION', vacations: [{ type: 'V26', day: 1, month: 4, days: 22 }], incidenceDay: 1, incidenceMonth: 1,
       limits: [{ incidence: '001', unit: 'H', value: 16 * 60 }, { incidence: '003', unit: 'H', value: 16 * 60 }, { incidence: '005', unit: 'H', value: 120 * 60 }] },
@@ -700,7 +700,7 @@ export class DemoDriver implements EvalosDriver {
     for (const r of rows) {
       const cur = list.find((x) => x.employee === r.employee && x.type === r.type && x.from === (r.prevFrom || r.from));
       const { prevFrom: _p, ...row } = r;
-      if (cur) { Object.assign(cur, { from: r.from, to: r.to, unit: r.unit === 'H' ? 'H' : 'D', days: r.days, hours: r.hours }); updated++; }
+      if (cur) { Object.assign(cur, { from: r.from, to: r.to, unit: r.unit === 'H' ? 'H' : 'D', days: r.days, hours: r.hours, minutesPerDay: r.unit === 'H' ? r.minutesPerDay : undefined }); updated++; }
       else { list.push({ ...row, unit: r.unit === 'H' ? 'H' : 'D', assignedDays: 0, assignedHours: 0 }); created++; }
     }
     await this.save(d);

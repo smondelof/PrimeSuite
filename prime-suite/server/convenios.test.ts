@@ -146,7 +146,13 @@ test('fin del periodo: mismo año posterior al inicio, o del año siguiente (tam
 
 test('periodos de vacaciones en horas: valor y pluses en minutos', () => {
   const c = sanitizeConvenio({ ...base, vacations: [{ type: 'AP', day: 1, month: 1, unit: 'H', minutes: 990, days: 3, pluses: [{ years: 5, value: 120 }] }] }, opts);
-  assert.deepEqual(c.vacations[0], { type: 'AP', day: 1, month: 1, endDay: 31, endMonth: 12, endNextYear: false, unit: 'H', days: 0, minutes: 990, pluses: [{ years: 5, value: 120 }] });
+  assert.deepEqual(c.vacations[0], { type: 'AP', day: 1, month: 1, endDay: 31, endMonth: 12, endNextYear: false, unit: 'H', days: 0, minutes: 990, minutesPerDay: 480, pluses: [{ years: 5, value: 120 }] });
+  // Horas de un día de vacaciones: por defecto 8 h; se puede indicar otra (7:30 h = 450).
+  assert.equal(sanitizeConvenio({ ...base, vacations: [{ type: 'AP', day: 1, month: 1, unit: 'H', minutes: 990, minutesPerDay: 450 }] }, opts).vacations[0].minutesPerDay, 450);
+  assert.throws(() => sanitizeConvenio({ ...base, vacations: [{ type: 'AP', day: 1, month: 1, unit: 'H', minutes: 990, minutesPerDay: 0 }] }, opts), /un día de vacaciones/);
+  assert.throws(() => sanitizeConvenio({ ...base, vacations: [{ type: 'AP', day: 1, month: 1, unit: 'H', minutes: 990, minutesPerDay: 1500 }] }, opts), /un día de vacaciones/);
+  // En días no lleva horas por día.
+  assert.equal(sanitizeConvenio({ ...base, vacations: [{ type: 'AP', day: 1, month: 1, days: 22, minutesPerDay: 450 }] }, opts).vacations[0].minutesPerDay, undefined);
   assert.throws(() => sanitizeConvenio({ ...base, vacations: [{ type: 'AP', day: 1, month: 1, unit: 'H', minutes: 0 }] }, opts), /mayor que 00:00/);
   assert.throws(() => sanitizeConvenio({ ...base, vacations: [{ type: 'AP', day: 1, month: 1, unit: 'H', minutes: 12.5 }] }, opts), /mayor que 00:00/);
   assert.throws(() => sanitizeConvenio({ ...base, vacations: [{ type: 'AP', day: 1, month: 1, unit: 'H', minutes: 60, pluses: [{ years: 2, value: 0.5 }] }] }, opts), /00:00/);
@@ -157,4 +163,5 @@ test('el script añade las columnas de periodos en horas y deja CA_DIAS opcional
   assert.match(sql, /COL_LENGTH\(N'\[evalos\]\.\[PS_CONVENIOS_VACACIONES\]', N'CA_UNID'\) IS NULL[\s\S]*ADD CA_UNID char\(1\) NULL, CA_MINU int NULL/);
   assert.match(sql, /DROP CONSTRAINT CK_PS_CONVENIOS_VACACIONES_DIAS[\s\S]*ALTER COLUMN CA_DIAS decimal\(5, 1\) NULL[\s\S]*CK_PS_CONVENIOS_VACACIONES_VALOR/);
   assert.match(conveniosSql("o'x"), /OBJECT_ID\(N''\[o''''x\]\.\[PS_CONVENIOS_VACACIONES\]''\)/);
+  assert.match(sql, /COL_LENGTH\(N'\[evalos\]\.\[PS_CONVENIOS_VACACIONES\]', N'CA_MDIA'\) IS NULL\s*ALTER TABLE \[evalos\]\.\[PS_CONVENIOS_VACACIONES\] ADD CA_MDIA int NULL/);
 });

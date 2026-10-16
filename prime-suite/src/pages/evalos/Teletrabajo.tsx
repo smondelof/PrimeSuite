@@ -3,7 +3,7 @@
 // aforo de la oficina, mínimos presenciales, acuerdos de trabajo a distancia (Ley 10/2021),
 // compensación de gastos e informe anual. El mismo archivo exporta el widget del Inicio.
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../api';
 import { Drawer, ErrorBox, Fold, Icon, Loading, Modal, Toggle, useData, useToast } from '../../components/ui';
 import { NotConfigured } from './common';
@@ -106,7 +106,8 @@ type Change = { employee: string; date: string; value: string | null };
 
 export default function Teletrabajo() {
   const toast = useToast();
-  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [params, setParams] = useSearchParams();
+  const [month, setMonth] = useState(() => { const m = params.get('month'); return m && /^\d{4}-\d{2}$/.test(m) ? m : new Date().toISOString().slice(0, 7); });
   const { data, error, reload } = useTeletrabajo(month);
   const [tab, setTab] = useState<Tab>('plan');
   const [dept, setDept] = useState('');
@@ -127,6 +128,15 @@ export default function Teletrabajo() {
 
   useEffect(() => { const up = () => { painting.current = false; }; window.addEventListener('mouseup', up); return () => window.removeEventListener('mouseup', up); }, []);
   useEffect(() => { setLocal({}); }, [data]);
+  // Deep-link desde el widget del Inicio: ?emp=CODE abre su calendario, ?alerts=1 la lista de avisos, ?pattern=1 rellenar el mes.
+  useEffect(() => {
+    if (!data || (!params.get('emp') && !params.get('alerts') && !params.get('pattern'))) return;
+    const emp = params.get('emp');
+    if (emp && data.view.rows.some((r) => r.code === emp)) setOpenEmp(emp);
+    if (params.get('alerts') === '1') { setTab('plan'); setShowAlerts(true); }
+    if (params.get('pattern') === '1' && data.canEdit) setPattern(true);
+    setParams({}, { replace: true });
+  }, [data, params, setParams]);
 
   const deptName = useMemo(() => new Map((data?.departments || []).map((d) => [d.code, d.description])), [data]);
   const rows = useMemo(() => {
@@ -894,35 +904,118 @@ function Ajustes({ d, onSaved }: { d: Resp; onSaved: () => void }) {
 }
 
 // ---------- Widget del Inicio ----------
-interface Hoy { today: string; workday: boolean; office: number; remote: number; absent: number; capacity: number | null; employees: number; alerts: number; exceeded: number; next: { date: string; office: number; remote: number }[] }
+type Who = 'O' | 'T' | 'H' | 'A';
+interface HoyDay { date: string; office: number; remote: number; absent: number; who: Record<string, Who>; hours: Record<string, number> }
+interface Hoy {
+  today: string; workday: boolean; office: number; remote: number; absent: number; capacity: number | null; employees: number; alerts: number; exceeded: number;
+  next: { date: string; office: number; remote: number }[];
+  days?: HoyDay[]; people?: { code: string; name: string; department: string }[];
+  topAlerts?: { level: 'warn' | 'bad' | 'info'; employee?: string; name?: string; date?: string; text: string }[];
+  canEdit?: boolean;
+}
+const ChevR = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>;
+const WHO_GROUPS: { k: Who; label: string }[] = [
+  { k: 'T', label: 'En teletrabajo' }, { k: 'O', label: 'En la oficina' }, { k: 'H', label: 'Mixto' }, { k: 'A', label: 'Ausentes' }
+];
+/** Nombre corto para las fichas: «ÁLVAREZ TORRES, ANA» o «Ana Álvarez Torres» → «Ana Álvarez». */
+function shortName(n: string) {
+  const [sur, given] = n.includes(',') && n.split(',')[1].trim() ? n.split(',').map((x) => x.trim()) : ['', n.replace(',', ' ').trim()];
+  const s = sur ? `${given.split(/\s+/)[0]} ${sur.split(/\s+/)[0]}` : given.split(/\s+/).slice(0, 2).join(' ');
+  return s === s.toUpperCase() ? s.toLowerCase().replace(/(^|\s)\p{L}/gu, (c) => c.toUpperCase()) : s;
+}
+const empLink = (code: string, date: string) => `/evalos/teletrabajo?emp=${encodeURIComponent(code)}&month=${date.slice(0, 7)}`;
+
 export function TeletrabajoWidget() {
   const { data, error } = useData(() => api.get<Hoy>('/api/evalos/teletrabajo/hoy').catch((e) => {
     if (e instanceof ApiError && e.code === 'not_configured') return null;
     throw e;
   }));
+  const [sel, setSel] = useState<string | null>(null);
+  const [expand, setExpand] = useState<Who | null>(null);
   if (error) return <ErrorBox error={error} />;
   if (data === null) return <NotConfigured compact />;
   if (!data) return <Loading />;
-  const max = Math.max(1, ...data.next.map((n) => n.office + n.remote));
+  const days = data.days || [];
+  const bars = days.length ? days : data.next.map((n) => ({ ...n, absent: 0, who: {}, hours: {} }));
+  const max = Math.max(1, ...bars.map((n) => n.office + n.remote));
+  const day = days.find((x) => x.date === sel) || days[0];
+  const people = new Map((data.people || []).map((p) => [p.code, p]));
+  const isToday = day?.date === data.today;
+  const dayLabel = day ? (isToday ? 'hoy' : `el ${WD_LONG[wd(day.date) - 1].toLowerCase()} ${Number(day.date.slice(8))}`) : '';
+  const overCap = !!(data.capacity && day && day.office > data.capacity);
   return (
     <div className="col" style={{ gap: 12 }}>
       <div className="row" style={{ gap: 10 }}>
-        <div className="ev-mini grow"><span className="xs muted" style={{ fontWeight: 600 }}>Hoy en la oficina</span><b style={{ color: data.capacity && data.office > data.capacity ? 'var(--bad)' : undefined }}>{data.workday ? `${data.office}${data.capacity ? ` / ${data.capacity}` : ''}` : '—'}</b></div>
-        <div className="ev-mini grow"><span className="xs muted" style={{ fontWeight: 600 }}>En teletrabajo</span><b>{data.workday ? data.remote : '—'}</b></div>
-        <div className="ev-mini grow"><span className="xs muted" style={{ fontWeight: 600 }}>Avisos</span><b style={{ color: data.alerts ? 'var(--bad)' : undefined }}>{data.alerts}</b></div>
+        <div className={`ev-mini grow${overCap ? ' alert' : ''}`}><span className="xs muted" style={{ fontWeight: 600 }}>{isToday || !day ? 'Hoy en la oficina' : `Oficina · ${WD[wd(day.date) - 1]} ${Number(day.date.slice(8))}`}</span><b>{day ? `${day.office}${data.capacity ? ` / ${data.capacity}` : ''}` : data.workday ? data.office : '—'}</b></div>
+        <div className="ev-mini grow"><span className="xs muted" style={{ fontWeight: 600 }}>En teletrabajo</span><b>{day ? day.remote : data.workday ? data.remote : '—'}</b></div>
+        <div className={`ev-mini grow${data.alerts ? ' alert' : ''}`}><span className="xs muted" style={{ fontWeight: 600 }}>Avisos</span><b>{data.alerts}</b></div>
       </div>
-      <div className="tw-week">
-        {data.next.map((n) => (
-          <div key={n.date} className="col" style={{ gap: 4, alignItems: 'center' }}>
-            <div className="tw-bar"><span className="o" style={{ height: `${(n.office / max) * 100}%` }} title={`${n.office} en oficina`} /><span className="t" style={{ height: `${(n.remote / max) * 100}%` }} title={`${n.remote} en teletrabajo`} /></div>
-            <span className="xs muted">{WD[wd(n.date) - 1]} {Number(n.date.slice(8))}</span>
-          </div>
-        ))}
+
+      <div className="tw-week" role="tablist" aria-label="Días">
+        {bars.map((n) => {
+          const on = day?.date === n.date;
+          return (
+            <button key={n.date} type="button" role="tab" aria-selected={on} className={`tw-wday${on ? ' on' : ''}`} disabled={!days.length}
+              onClick={() => { setSel(n.date); setExpand(null); }} title={`${n.office} en oficina · ${n.remote} en teletrabajo`}>
+              <div className="tw-bar"><span className="o" style={{ height: `${(n.office / max) * 100}%` }} /><span className="t" style={{ height: `${(n.remote / max) * 100}%` }} /></div>
+              <span className="xs">{n.date === data.today ? 'Hoy' : `${WD[wd(n.date) - 1]} ${Number(n.date.slice(8))}`}</span>
+            </button>
+          );
+        })}
       </div>
-      <div className="row" style={{ justifyContent: 'space-between' }}>
-        <span className="xs muted">{data.exceeded ? `${data.exceeded} bolsa(s) superada(s)` : 'Bolsas al día'}</span>
-        <Link to="/evalos/teletrabajo" className="xs">Abrir planificación</Link>
+
+      {day && (
+        <div className="col" style={{ gap: 8 }}>
+          <span className="xs muted" style={{ fontWeight: 600 }}>Quién está {dayLabel}</span>
+          {WHO_GROUPS.map(({ k, label }) => {
+            const codes = Object.keys(day.who).filter((c) => day.who[c] === k)
+              .sort((a, b) => (people.get(a)?.name || a).localeCompare(people.get(b)?.name || b, 'es'));
+            if (!codes.length) return null;
+            const LIMIT = 8;
+            const shown = expand === k ? codes : codes.slice(0, LIMIT);
+            return (
+              <div key={k} className="tw-who">
+                <span className="tw-who-h"><span className={`tw-sw k-${k}`} />{label} <b>{codes.length}</b></span>
+                <div className="tw-who-list">
+                  {shown.map((c) => {
+                    const p = people.get(c);
+                    return (
+                      <Link key={c} to={empLink(c, day.date)} className="tw-who-chip" title={`${p?.name || c}${p?.department ? ` · ${p.department}` : ''}${k === 'H' ? ` · ${day.hours[c]} h de teletrabajo` : ''}`}>
+                        {shortName(p?.name || c)}{k === 'H' && <span className="muted"> {day.hours[c]}h</span>}
+                      </Link>
+                    );
+                  })}
+                  {codes.length > LIMIT && (
+                    <button type="button" className="tw-who-chip more" onClick={() => setExpand(expand === k ? null : k)}>
+                      {expand === k ? 'Ver menos' : `+${codes.length - LIMIT} más`}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {!Object.keys(day.who).length && <div className="w-empty">Nadie con planificación para {dayLabel}.</div>}
+        </div>
+      )}
+
+      {!!data.topAlerts?.length && (
+        <div className="w-list">
+          {data.topAlerts.slice(0, 3).map((a, i) => (
+            <Link key={i} to={a.employee ? empLink(a.employee, a.date || data.today) : '/evalos/teletrabajo?alerts=1'} className="w-row">
+              <span className="w-row-main"><b>{a.name || 'Oficina'}</b><span className="xs muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.text}</span></span>
+              <span className={`tag ${a.level === 'bad' ? 'bad' : 'warn'}`}>{a.level === 'bad' ? 'Urgente' : 'Aviso'}</span>
+              <span className="chev-r"><ChevR /></span>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      <div className="w-quick">
+        <Link to="/evalos/teletrabajo"><Icon.calendar /> Planificación</Link>
+        {data.alerts > 0 && <Link to="/evalos/teletrabajo?alerts=1"><Icon.ext /> Ver los {data.alerts} avisos</Link>}
+        {data.canEdit && <Link to="/evalos/teletrabajo?pattern=1"><Icon.plus /> Rellenar el mes</Link>}
       </div>
+      {data.exceeded > 0 && <span className="xs" style={{ color: 'var(--bad)' }}>{data.exceeded} bolsa(s) de teletrabajo superada(s) este mes</span>}
     </div>
   );
 }

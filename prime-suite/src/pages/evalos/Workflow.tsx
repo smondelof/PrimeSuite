@@ -3,7 +3,8 @@
 // (y los que se le añadan), y a quien haga falta (p. ej. un jefe de departamento) se le asigna a mano quién le valida.
 // Prime Suite crea y asigna los perfiles de WORKFLOW (nivel 1 calculado); aquí se editan los niveles 2 a 4 y el orden
 // de validación de cada solicitud. El mismo archivo exporta el widget del Inicio.
-import { Fragment, useMemo, useState, type FormEvent, type JSX, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useState, type FormEvent, type JSX, type ReactNode } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api, ApiError, type EvalosWfPerson, type EvalosWfProfile, type EvalosWfRole, type EvalosWorkflowResponse, type EvalosWorkflowSync } from '../../api';
 import { ErrorBox, Icon, Loading, Modal, confirmAction, useData, useToast } from '../../components/ui';
 import { NotConfigured, workflowToast } from './common';
@@ -36,9 +37,14 @@ function useNames(d: D) {
 export default function Workflow() {
   const { data, error, reload } = useWorkflow();
   const toast = useToast();
-  const [tab, setTab] = useState<Tab>('personas');
+  const [params, setParams] = useSearchParams();
+  const validTab = (t: string | null): t is Tab => ['personas', 'departamentos', 'perfiles', 'ajustes'].includes(t || '');
+  const [tab, setTab] = useState<Tab>(validTab(params.get('tab')) ? (params.get('tab') as Tab) : 'personas');
+  // Código a abrir que llega del widget del Inicio (?open=XX); se consume una vez.
+  const [openCode, setOpenCode] = useState<string | undefined>(params.get('open') || undefined);
   const [applying, setApplying] = useState(false);
   const [showWarnings, setShowWarnings] = useState(false);
+  useEffect(() => { if (params.get('tab') || params.get('open')) setParams({}, { replace: true }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (error) return error;
   if (!data) return <Loading />;
   if (data.missing) return <MissingTables missing={data.missing} onRetry={reload} />;
@@ -90,9 +96,9 @@ export default function Workflow() {
         ))}
       </div>
 
-      {tab === 'personas' && <PeopleTab d={d} onChanged={reload} />}
+      {tab === 'personas' && <PeopleTab d={d} onChanged={reload} openCode={tab === 'personas' ? openCode : undefined} onOpened={() => setOpenCode(undefined)} />}
       {tab === 'departamentos' && <DepartmentsTab d={d} />}
-      {tab === 'perfiles' && <ProfilesTab d={d} onChanged={reload} />}
+      {tab === 'perfiles' && <ProfilesTab d={d} onChanged={reload} openCode={tab === 'perfiles' ? openCode : undefined} onOpened={() => setOpenCode(undefined)} />}
       {tab === 'ajustes' && d.canConfigure && (
         <SettingsForm settings={d.settings} roles={d.roles} profiles={d.profiles} endpoint="/api/evalos/workflow/ajustes" onChanged={reload} />
       )}
@@ -101,7 +107,7 @@ export default function Workflow() {
 }
 
 // ---------- Personas ----------
-function PeopleTab({ d, onChanged }: { d: D; onChanged: () => void }) {
+function PeopleTab({ d, onChanged, openCode, onOpened }: { d: D; onChanged: () => void; openCode?: string; onOpened?: () => void }) {
   const toast = useToast();
   const names = useNames(d);
   const [q, setQ] = useState('');
@@ -112,6 +118,13 @@ function PeopleTab({ d, onChanged }: { d: D; onChanged: () => void }) {
   const [bulkRole, setBulkRole] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [edit, setEdit] = useState<EvalosWfPerson | null>(null);
+  // Abre la validación de la persona que llega del widget del Inicio.
+  useEffect(() => {
+    if (!openCode) return;
+    const p = d.people.find((x) => x.code === openCode);
+    if (p) setEdit(p);
+    onOpened?.();
+  }, [openCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const needle = q.trim().toLowerCase();
   const list = d.people.filter((p) =>
@@ -348,10 +361,16 @@ function DepartmentsTab({ d }: { d: D }) {
 }
 
 // ---------- Perfiles ----------
-function ProfilesTab({ d, onChanged }: { d: D; onChanged: () => void }) {
+function ProfilesTab({ d, onChanged, openCode, onOpened }: { d: D; onChanged: () => void; openCode?: string; onOpened?: () => void }) {
   const names = useNames(d);
   const [edit, setEdit] = useState<EvalosWfProfile | null>(null);
   const [showOthers, setShowOthers] = useState(false);
+  useEffect(() => {
+    if (!openCode) return;
+    const p = d.profiles.find((x) => x.code === openCode);
+    if (p) setEdit(p);
+    onOpened?.();
+  }, [openCode]); // eslint-disable-line react-hooks/exhaustive-deps
   const dyn = d.profiles.filter((p) => p.dyn).sort((a, b) => a.name.localeCompare(b.name));
   const others = d.profiles.filter((p) => !p.dyn);
   const deptName = (c: string) => names.dept.get(c) || c;
@@ -427,18 +446,42 @@ function ProfilesTab({ d, onChanged }: { d: D; onChanged: () => void }) {
 }
 
 // ---------- Widget ----------
+const ChevR = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>;
+
 export function WorkflowWidget() {
   const { data, error } = useWorkflow();
   if (error) return error;
   if (!data) return <Loading />;
-  if (data.missing) return <span className="small muted">No se han podido crear las tablas de Perfiles Workflow en la base de datos de Evalos 8. Abre la pantalla para ver el motivo.</span>;
+  if (data.missing) return <Link to="/evalos/workflow" className="small muted">No se han podido crear las tablas de Perfiles Workflow en Evalos 8. Abre la pantalla para ver el motivo →</Link>;
   const d = data as D;
-  const noValidator = d.people.filter((p) => p.active && p.workflowRol && !p.level1.length).length;
+  const withRole = d.people.filter((p) => p.workflowRol).length;
+  const noValidator = d.people.filter((p) => p.active && p.workflowRol && !p.level1.length);
+  const profileAlerts = d.profiles.filter((p) => p.dyn && p.alerts.length);
+  // Lo accionable: perfiles con avisos primero, luego personas sin validador.
+  const rows = [
+    ...profileAlerts.map((p) => ({ key: `p${p.code}`, to: `/evalos/workflow?tab=perfiles&open=${encodeURIComponent(p.code)}`, title: p.name, sub: p.alerts[0], tag: 'Aviso' })),
+    ...noValidator.map((p) => ({ key: `u${p.code}`, to: `/evalos/workflow?tab=personas&open=${encodeURIComponent(p.code)}`, title: p.name, sub: `${ROLE_LABEL[p.workflowRol] || p.workflowRol} · sin validador de nivel 1`, tag: 'Sin validador' }))
+  ];
   return (
-    <div className="col" style={{ gap: 10 }}>
+    <div className="col" style={{ gap: 12 }}>
       <div className="row" style={{ gap: 10 }}>
-        <div className="card grow" style={{ gap: 2, padding: '12px 14px' }}><span className="xs muted" style={{ fontWeight: 600 }}>Personas con rol</span><span className="stat">{d.people.filter((p) => p.workflowRol).length}</span></div>
-        <div className="card grow" style={{ gap: 2, padding: '12px 14px' }}><span className="xs muted" style={{ fontWeight: 600 }}>Sin validador</span><span className="stat">{noValidator}</span></div>
+        <div className="ev-mini grow"><span className="xs muted" style={{ fontWeight: 600 }}>Personas con rol</span><b>{withRole}</b></div>
+        <div className={`ev-mini grow${profileAlerts.length ? ' alert' : ''}`}><span className="xs muted" style={{ fontWeight: 600 }}>Perfiles con aviso</span><b>{profileAlerts.length}</b></div>
+        <div className={`ev-mini grow${noValidator.length ? ' alert' : ''}`}><span className="xs muted" style={{ fontWeight: 600 }}>Sin validador</span><b>{noValidator.length}</b></div>
+      </div>
+      <div className="w-list">
+        {rows.slice(0, 4).map((r) => (
+          <Link key={r.key} to={r.to} className="w-row">
+            <span className="w-row-main"><b>{r.title}</b><span className="xs muted">{r.sub}</span></span>
+            <span className="tag warn">{r.tag}</span>
+            <span className="chev-r"><ChevR /></span>
+          </Link>
+        ))}
+        {!rows.length && <div className="w-empty"><Icon.ok /> Todo en orden: perfiles con validadores.</div>}
+      </div>
+      <div className="w-quick">
+        <Link to="/evalos/workflow?tab=perfiles"><Icon.layers /> Perfiles</Link>
+        <Link to="/evalos/workflow?tab=personas"><Icon.users /> Personas</Link>
       </div>
     </div>
   );

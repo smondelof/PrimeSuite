@@ -1,16 +1,18 @@
 // Atajos de Evalos: módulo nativo con las funciones principales de Evalos 8,
 // trabajando directamente sobre su base de datos.
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Navigate, NavLink, useParams } from 'react-router-dom';
 import { AppIcon, ErrorBox, Icon, Loading } from '../../components/ui';
 import { useNavGroup } from '../../components/navGroups';
 import { SCREENS } from './screens';
 import { ConnectionTag, EVALOS_COLOR, loadEvalosMe, useEvalosMe } from './common';
 import EvalosConfig from './Config';
+import EvalosCallLog from './CallLog';
 
 export default function Evalos() {
   const { screen } = useParams();
   const { data: me, error, reload } = useEvalosMe();
+  const [callLog, setCallLog] = useState(false);
   if (error) return <ErrorBox error={error} />;
   if (!me) return <Loading />;
 
@@ -39,8 +41,16 @@ export default function Evalos() {
             <span className="muted small">Las funciones principales de Evalos 8, directamente sobre su base de datos.</span>
           </div>
         </div>
-        <ConnectionTag me={me} />
+        <div className="row" style={{ gap: 8, flexDirection: 'row', alignItems: 'center' }}>
+          {me.isAdmin && (
+            <button type="button" className="btn sm" onClick={() => setCallLog(true)} title="Lo que Prime Suite envía a Evalos 8 (SOAP, EvalosRest y periodos) y lo que responde">
+              <Icon.list /> Log de llamadas
+            </button>
+          )}
+          <ConnectionTag me={me} />
+        </div>
       </div>
+      {callLog && <EvalosCallLog onClose={() => setCallLog(false)} />}
 
       <div className="ev-layout">
         <nav className="card ev-nav" aria-label="Pantallas de Atajos de Evalos">

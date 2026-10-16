@@ -161,6 +161,7 @@ Si un dashboard solo tiene URL directa (sin UUID), se muestra en un iframe plano
 - **SOAP ServiciosCliente** (p. ej. `https://evalos-d.digitekcloud.com/Digitek/suiteclient133/servicioscliente.asmx`): no pide autenticación. Lee del WSDL el espacio de nombres y los parámetros de cada operación y los rellena por su significado. `EmpresaConexion` = los dígitos tras «suiteclient» en la URL. `callEvalosSoap(op, valores)` devuelve el texto del resultado: «Ok», vacío o `true` = correcto.
 - **Tablas y columnas propias**: cuando una pantalla necesita algo que no existe en la BD de Evalos 8 (tablas `PS_*` de Convenios y Perfiles Workflow, o columnas de `PERSONAL` como `EM_CONV` y `EM_WORKFLOWROL`), Prime Suite lo crea solo (`ensureSchema` en `server/evalos/mssql.ts`), sin pedir scripts. Para ello el usuario SQL de la conexión necesita permiso para crear y modificar tablas (p. ej. `db_ddladmin`); si no lo tiene, la pantalla lo explica y deja el script plegado como último recurso.
 - Cuando un servicio externo no documenta los formatos, se lee de forma tolerante (varios formatos, campos por varios nombres) y la pantalla ofrece **«Ver respuesta»** para diagnosticar con datos reales.
+- **Log de llamadas a Evalos** (`server/evalos/calllog.ts`, `src/pages/evalos/CallLog.tsx`; botón «Log de llamadas» en la cabecera del módulo, solo administradores): cada llamada SOAP (parámetros, sobre enviado y respuesta), cada llamada a EvalosRest (URL, cuerpo, estado y respuesta) y cada escritura de periodos en `VACACIONES` / `INCIDENCIALIMITE` (columna → valor y tipo, y la sentencia). Se guardan las últimas 250 durante 7 días, sin tokens ni secretos; las respuestas de las consultas se recortan.
 
 ### Pantallas
 
@@ -187,7 +188,8 @@ Si un dashboard solo tiene URL directa (sin UUID), se muestra en un iframe plano
     - Periodo en curso: el último que ha empezado (con su inicio y fin); si ya terminó, el siguiente. Si el alta cae dentro, empieza en la fecha de alta y se prorratea: vacaciones al medio día, límites al minuto.
     - Se suma el plus del tramo de antigüedad más alto alcanzado al inicio del periodo.
     - Periodo en días: `PERIODOENDIAS` 1, `TOTALDIAS` con los días y `TOTALHORAS` = días × 8 h (provisional).
-    - Periodo en horas: `PERIODOENDIAS` 0, `TOTALDIAS` 0 y `TOTALHORAS` con las horas (con decimales: 16:30 h = 16,5). Se prorratea al minuto.
+    - Periodo en horas, como lo graba Evalos: `PERIODOENDIAS` 0, `TOTALDIAS` con el total **en minutos** (150 h = 9000), `MINUTOSDIA` con lo que vale un día de vacaciones y `TOTALHORAS` 0. Se prorratea al minuto. Las filas grabadas por la versión anterior (horas en `TOTALHORAS`) se corrigen al volver a guardar el convenio.
+    - Cada periodo en horas tiene **«1 día = HH:MM»** (por defecto 08:00, columna `CA_MDIA`): son las horas que se asignan al poner un día de vacaciones de ese tipo. En Correcciones se proponen esas horas al elegir un tipo en horas.
     - Una fila existente se actualiza sin tocar lo disfrutado; quitar a alguien del convenio no borra sus periodos.
     - *Generar periodos del año siguiente* crea los del periodo siguiente.
     - Se avisa, en el convenio y en la ficha, cuando lo disfrutado supera lo disponible.

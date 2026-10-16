@@ -1,7 +1,7 @@
 // Tests del cálculo de periodos de vacaciones y límites de incidencia a partir del convenio.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computePeriod, currentRef, linePeriod, periodOfYear, excessAlerts, nextRef, plusFor, rowsFor, seniorityYears, syncPeriods, yearPeriod } from './evalos/convperiods.ts';
+import { computePeriod, readVacationColumns, vacationColumns, currentRef, linePeriod, periodOfYear, excessAlerts, nextRef, plusFor, rowsFor, seniorityYears, syncPeriods, yearPeriod } from './evalos/convperiods.ts';
 import type { Convenio, Personal } from './evalos/types.ts';
 
 test('periodo de un año: la fecha fin es el día anterior', () => {
@@ -177,10 +177,28 @@ test('periodo de vacaciones en horas: TOTALHORAS en horas, plus en minutos y pro
   const conv: Convenio = { ...CONV, vacations: [{ type: 'AP', day: 1, month: 1, unit: 'H', days: 0, minutes: 16 * 60 + 30, pluses: [{ years: 5, value: 90 }] }], limits: [] };
   // 7 años de antigüedad: 16:30 + 1:30 = 18 h.
   assert.deepEqual(rowsFor(conv, emp('1', '2019-03-01'), () => '2026-10-09').vac,
-    [{ employee: '1', type: 'AP', from: '2026-01-01', to: '2026-12-31', unit: 'H', days: 0, hours: 18 }]);
+    [{ employee: '1', type: 'AP', from: '2026-01-01', to: '2026-12-31', unit: 'H', days: 0, hours: 18, minutesPerDay: 480 }]);
   // Alta el 02/07/2026 (183 de 365 días): 990 min × 183 / 365 = 496,4 → 496 min = 8,27 h.
   assert.deepEqual(rowsFor(conv, emp('2', '2026-07-02'), () => '2026-10-09').vac,
-    [{ employee: '2', type: 'AP', from: '2026-07-02', to: '2026-12-31', unit: 'H', days: 0, hours: 8.27 }]);
+    [{ employee: '2', type: 'AP', from: '2026-07-02', to: '2026-12-31', unit: 'H', days: 0, hours: 8.27, minutesPerDay: 480 }]);
+  // Horas de un día del convenio.
+  const conv2: Convenio = { ...conv, vacations: [{ ...conv.vacations[0], minutesPerDay: 450 }] };
+  assert.equal(rowsFor(conv2, emp('1', '2019-03-01'), () => '2026-10-09').vac[0].minutesPerDay, 450);
+});
+
+test('columnas de VACACIONES como las graba Evalos: en horas, total en minutos en TOTALDIAS y MINUTOSDIA', () => {
+  // 150 h con 8 h por día → TOTALDIAS 9000, MINUTOSDIA 480, TOTALHORAS 0 (fila L26 de Evalos).
+  assert.deepEqual(vacationColumns({ unit: 'H', days: 0, hours: 150, minutesPerDay: 480 }), { totalDias: 9000, totalHoras: 0, minutosDia: 480 });
+  assert.deepEqual(vacationColumns({ unit: 'H', days: 0, hours: 8.27, minutesPerDay: 450 }), { totalDias: 496, totalHoras: 0, minutosDia: 450 });
+  assert.deepEqual(vacationColumns({ unit: 'D', days: 22, hours: 176 }), { totalDias: 22, totalHoras: 176, minutosDia: 0 });
+  // Lectura: la fila de Evalos y las grabadas por la versión anterior (TOTALDIAS 0 y horas en TOTALHORAS).
+  assert.deepEqual(readVacationColumns({ pd: 0, totalDias: 9000, totalHoras: 0, diasAsignados: 0, horasAsignadas: 0, minutosDia: 480 }),
+    { unit: 'H', days: 0, hours: 150, assignedDays: 0, assignedHours: 0, minutesPerDay: 480 });
+  assert.deepEqual(readVacationColumns({ pd: '0', totalDias: 0, totalHoras: 160, diasAsignados: 0, horasAsignadas: 0, minutosDia: 0 }),
+    { unit: 'H', days: 0, hours: 160, assignedDays: 0, assignedHours: 0 });
+  assert.equal(readVacationColumns({ pd: 0, totalDias: 9000, totalHoras: 0, diasAsignados: 960, horasAsignadas: 0, minutosDia: 480 }).assignedHours, 16);
+  assert.deepEqual(readVacationColumns({ pd: 1, totalDias: 22, totalHoras: 176, diasAsignados: 3, horasAsignadas: 0, minutosDia: 0 }),
+    { unit: 'D', days: 22, hours: 176, assignedDays: 3, assignedHours: 0 });
 });
 
 test('avisos de exceso en periodos de vacaciones en horas', () => {

@@ -15,6 +15,7 @@ import { HISTORY, isHistoryKind, madridNow } from '../evalos/history.ts';
 import { personalDriverFor, stampFor } from '../evalos/employees.ts';
 import { VACATION_TYPE_MAX, conveniosSql, sanitizeConvenio } from '../evalos/convenios.ts';
 import { alertsFor, syncPeriods, type PeriodSyncResult } from '../evalos/convperiods.ts';
+import { clearCallLog, readCallLog, setCallContext } from '../evalos/calllog.ts';
 import {
   DEFAULT_WF_SETTINGS, WF_LEVEL_COLS, WF_REQUESTS, WF_ROLES, isWfRole, levelCodes, parseKey, planWorkflow, profileAlerts, sanitizeProfileEdit,
   sanitizeValidation, sanitizeWfSettings, validationMap, workflowSql, type WorkflowPerson, type WorkflowSettings, type WorkflowSyncResult
@@ -94,6 +95,8 @@ export async function requireEvalos(req: Request) {
   const c = await requireUser(req);
   const a = await evalosAccess(c);
   if (!a.role) throw new HttpError(403, 'No tienes acceso a Atajos de Evalos');
+  // Las llamadas a Evalos de esta petición quedan en el log con la empresa y el usuario.
+  setCallContext(c.company.id, c.user.email);
   return { c, ...a };
 }
 
@@ -254,10 +257,30 @@ export function evalosRoutes(r: Router) {
     if (!a.role) throw new HttpError(403, 'No tienes acceso a Atajos de Evalos');
     const cfg = await getConfig(c.company.id);
     return json({
-      role: a.role, canEdit: a.canEdit, canDelete: a.canDelete, canConfigure: a.canConfigure,
+      role: a.role, canEdit: a.canEdit, canDelete: a.canDelete, canConfigure: a.canConfigure, isAdmin: a.isAdmin,
       configured: isConfigured(cfg), engine: cfg?.engine || null, connHint: cfg?.connHint || null,
       screens: visibleScreens(cfg, a.isAdmin)
     });
+  });
+
+  // --- Log de llamadas a Evalos (SOAP, EvalosRest y escrituras de periodos): solo administradores ---
+  r.get('/api/evalos/llamadas', async (req) => {
+    const { c } = await requireEvalosAdmin(req);
+    const q = new URL(req.url).searchParams;
+    const kind = q.get('kind');
+    const events = await readCallLog({
+      companyId: c.user.role === 'superadmin' ? undefined : c.company.id,
+      kind: kind === 'soap' || kind === 'rest' || kind === 'sql' ? kind : undefined,
+      since: q.get('since') || undefined
+    });
+    return json({ events });
+  });
+
+  r.del('/api/evalos/llamadas', async (req) => {
+    const { c } = await requireEvalosAdmin(req);
+    await clearCallLog(c.user.role === 'superadmin' ? undefined : c.company.id);
+    log(c, req, 'evalos.llamadas.vaciar');
+    return json({ ok: true });
   });
 
   // --- Configuración (administradores) ---
@@ -968,7 +991,7 @@ export function evalosRoutes(r: Router) {
     if (!driver.listEmployeePeriods) return [];
     const { vacations } = await driver.listEmployeePeriods([employee], date);
     return vacations.filter((v) => v.employee === employee && v.from <= date && (!v.to || v.to >= date))
-      .map((v) => ({ type: v.type, unit: v.unit || 'D', from: v.from, to: v.to, days: v.days, hours: v.hours, assignedDays: v.assignedDays, assignedHours: v.assignedHours }));
+      .map((v) => ({ type: v.type, unit: v.unit || 'D', from: v.from, to: v.to, days: v.days, hours: v.hours, minutesPerDay: v.minutesPerDay ?? null, assignedDays: v.assignedDays, assignedHours: v.assignedHours }));
   };
   r.get('/api/evalos/correcciones/periodosvacaciones', async (req) => {
     const { c } = await requireEvalos(req);

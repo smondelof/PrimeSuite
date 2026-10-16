@@ -362,6 +362,19 @@ pre.code { margin: 0; padding: 16px; background: var(--ink); color: #E7E4EC; bor
 .ev-wrow:hover { background: #E7ECEF; }
 .ev-mini { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; border-radius: 10px; background: var(--surface-2); }
 .ev-mini b { font-size: 20px; }
+.ev-mini.alert b { color: var(--bad); }
+/* Filas accionables y accesos rápidos de los widgets del Inicio */
+.w-list { display: flex; flex-direction: column; gap: 6px; }
+.w-row { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 10px; background: var(--surface-2); color: var(--ink); text-decoration: none; border: 1px solid transparent; transition: border-color .15s, background .15s; }
+.w-row:hover { border-color: var(--line); background: #fff; }
+.w-row .w-row-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.w-row .w-row-main b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w-row .chev-r { color: var(--muted); display: inline-flex; flex-shrink: 0; }
+.w-quick { display: flex; gap: 8px; flex-wrap: wrap; }
+.w-quick a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 9px; background: var(--surface-2); color: var(--ink); text-decoration: none; font-size: 12.5px; font-weight: 600; border: 1px solid var(--line); transition: background .15s; }
+.w-quick a:hover { background: #fff; }
+.w-quick a svg { width: 15px; height: 15px; }
+.w-empty { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); color: var(--muted); font-size: 13px; }
 .ev-emps { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .ev-emp { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid var(--line-2); }
 .ev-emp:first-child { border-top: 0; }
@@ -610,6 +623,13 @@ body {
 .sso-kv .sso-kv { margin-top: 2px; }
 .sso-identity { gap: 4px; padding: 14px 16px; border-left: 3px solid var(--info-ink); }
 
+/* Log de llamadas a Evalos */
+.evcall-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.evcall-head .chev { display: inline-flex; color: var(--muted); transition: transform .15s; }
+.evcall-head .chev.open { transform: rotate(180deg); }
+.evcall-head b { word-break: break-all; }
+pre.code.evcall-pre { max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-all; padding: 12px; font-size: 12px; }
+
 
 /* ---- Atajos de Evalos · Teletrabajo ---- */
 .tw-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -673,6 +693,17 @@ body {
 .tw-bar { height: 64px; width: 28px; display: flex; flex-direction: column-reverse; border-radius: 8px; overflow: hidden; background: rgba(36,58,77,.06); }
 .tw-bar .o { background: #31506A; }
 .tw-bar .t { background: #0E9F7E; }
+.tw-wday { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; border: 1px solid transparent; border-radius: 10px; background: none; color: var(--muted); cursor: pointer; font: inherit; }
+.tw-wday:hover:not(:disabled) { background: var(--surface-2); }
+.tw-wday.on { border-color: var(--line); background: var(--surface-2); color: var(--ink); font-weight: 700; }
+.tw-wday:disabled { cursor: default; }
+.tw-who { display: flex; flex-direction: column; gap: 5px; }
+.tw-who-h { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.tw-who-h b { color: var(--ink); }
+.tw-who-list { display: flex; flex-wrap: wrap; gap: 5px; }
+.tw-who-chip { display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 999px; background: var(--surface-2); border: 1px solid transparent; color: var(--ink); font-size: 12.5px; text-decoration: none; font-family: inherit; cursor: pointer; transition: border-color .15s, background .15s; }
+.tw-who-chip:hover { border-color: var(--line); background: #fff; }
+.tw-who-chip.more { color: var(--muted); font-weight: 600; }
 .tw-name-btn { border: 0; background: none; padding: 0; text-align: left; cursor: pointer; color: var(--ink); min-width: 0; }
 .tw-name-btn b { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tw-name-btn:hover b { color: var(--brand-ink); }

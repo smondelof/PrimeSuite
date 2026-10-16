@@ -110,7 +110,7 @@ export function rowsFor(conv: Convenio, emp: Pick<Personal, 'code' | 'hireDate'>
     const unit: 'D' | 'H' = v.unit === 'H' ? 'H' : 'D';
     const p = computePeriod({ day: v.day, month: v.month, endDay: v.endDay, endMonth: v.endMonth, endNextYear: v.endNextYear, value: unit === 'H' ? v.minutes || 0 : v.days, pluses: v.pluses }, emp.hireDate, refOf(v), unit);
     if (!p) continue;
-    if (unit === 'H') vac.push({ employee: emp.code, type: v.type, from: p.from, to: p.to, unit, days: 0, hours: Math.round((p.value / 60) * 100) / 100 });
+    if (unit === 'H') vac.push({ employee: emp.code, type: v.type, from: p.from, to: p.to, unit, days: 0, hours: Math.round((p.value / 60) * 100) / 100, minutesPerDay: v.minutesPerDay || HOURS_PER_DAY * 60 });
     else vac.push({ employee: emp.code, type: v.type, from: p.from, to: p.to, unit, days: p.value, hours: Math.round(p.value * HOURS_PER_DAY * 100) / 100 });
   }
   const inc: IncidenceLimitRow[] = [];
@@ -120,6 +120,31 @@ export function rowsFor(conv: Convenio, emp: Pick<Personal, 'code' | 'hireDate'>
     if (p) inc.push({ employee: emp.code, incidence: l.incidence, from: p.from, to: p.to, unit: l.unit, value: p.value });
   }
   return { vac, inc };
+}
+
+/**
+ * Columnas de VACACIONES de un periodo, como las graba Evalos 8:
+ *  - en días:  TOTALDIAS = días, TOTALHORAS = días × 8 (provisional), MINUTOSDIA 0;
+ *  - en horas: TOTALDIAS = total en minutos (150 h = 9000), MINUTOSDIA = minutos de un día de vacaciones, TOTALHORAS 0.
+ */
+export function vacationColumns(r: Pick<VacationPeriodRow, 'unit' | 'days' | 'hours' | 'minutesPerDay'>) {
+  if (r.unit === 'H') return { totalDias: Math.round(r.hours * 60), totalHoras: 0, minutosDia: r.minutesPerDay || HOURS_PER_DAY * 60 };
+  return { totalDias: r.days, totalHoras: r.hours, minutosDia: 0 };
+}
+
+/**
+ * Lee una fila de VACACIONES (PERIODOENDIAS 0 = en horas). En horas el total va en minutos en TOTALDIAS; las filas
+ * grabadas por la versión anterior (TOTALDIAS 0 y horas en TOTALHORAS) también se leen. Lo disfrutado en un periodo en
+ * horas se toma de DIASASIGNADOS en minutos (como el total) o, si está a 0, de HORASASIGNADAS (pendiente de confirmar).
+ */
+export function readVacationColumns(r: { pd: unknown; totalDias: number; totalHoras: number; diasAsignados: number; horasAsignadas: number; minutosDia: number }) {
+  if (String(r.pd ?? '1').trim() !== '0') {
+    return { unit: 'D' as const, days: r.totalDias, hours: r.totalHoras, assignedDays: r.diasAsignados, assignedHours: r.horasAsignadas };
+  }
+  const minutes = r.totalDias > 0 ? r.totalDias : Math.round(r.totalHoras * 60);
+  const assigned = r.diasAsignados > 0 ? r.diasAsignados / 60 : r.horasAsignadas;
+  return { unit: 'H' as const, days: 0, hours: Math.round((minutes / 60) * 100) / 100, assignedDays: 0, assignedHours: Math.round(assigned * 100) / 100,
+    ...(r.minutosDia > 0 ? { minutesPerDay: r.minutosDia } : {}) };
 }
 
 const fmt = (d: string) => d.split('-').reverse().join('/');

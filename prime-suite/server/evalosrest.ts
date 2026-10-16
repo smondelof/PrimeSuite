@@ -6,6 +6,7 @@ import { HttpError } from './http.ts';
 import { Modules, type Module } from './db.ts';
 import { decryptSecret } from './crypto.ts';
 import { safeFetch } from './netguard.ts';
+import { logEvalosCall } from './evalos/calllog.ts';
 
 /** clientId de la integración cuya API REST se usa para Evalos 8. */
 export const EVALOS_REST_CLIENT_ID = 'evalos8';
@@ -113,13 +114,21 @@ async function evalosRestCall<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path
       throw new HttpError(502, `No se pudo conectar con EvalosRest (${e?.name === 'AbortError' ? 'sin respuesta en 30 s' : e?.cause?.code || e?.message}).`);
     }
   };
-  const token = await getToken(m, portalOrigin);
-  let res = await call(token);
-  // Token caducado o revocado: se pide uno nuevo y se reintenta una vez.
-  if (res.status === 401) res = await call(await getToken(m, portalOrigin, token));
+  const entry = { kind: 'rest' as const, op: `${method} ${path.split('?')[0]}`, url, request: payload === undefined ? undefined : JSON.stringify(payload, null, 2) };
+  let res: Response;
+  try {
+    const token = await getToken(m, portalOrigin);
+    res = await call(token);
+    // Token caducado o revocado: se pide uno nuevo y se reintenta una vez.
+    if (res.status === 401) res = await call(await getToken(m, portalOrigin, token));
+  } catch (e: any) {
+    void logEvalosCall({ ...entry, ok: false, ms: Date.now() - started, error: e?.message || String(e) });
+    throw e;
+  }
   const text = await res.text();
   let data: any = text;
   try { data = text ? JSON.parse(text) : null; } catch { /* respuesta no JSON */ }
+  void logEvalosCall({ ...entry, ok: res.ok, status: res.status, ms: Date.now() - started, response: text || '(vacía)' });
   if (!res.ok) {
     const msg = typeof data === 'object' && data ? data.Message || data.message || data.error || '' : String(data ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
     if (!throwOnError) return { data, status: res.status, ms: Date.now() - started, url, ok: false, message: String(msg).slice(0, 200) };

@@ -1,4 +1,8 @@
 // Utilidades HTTP: respuestas, cookies, errores y un router mínimo.
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+/** Datos de la petición en curso (p. ej. empresa y usuario para el log de llamadas a Evalos). Se rellena en las rutas. */
+export const requestContext = new AsyncLocalStorage<Record<string, string>>();
 
 export class HttpError extends Error {
   constructor(public status: number, message: string, public code?: string) {
@@ -119,7 +123,7 @@ export class Router {
       if (r.method !== req.method && !(r.method === 'GET' && req.method === 'HEAD')) continue;
       const params: Record<string, string> = {};
       r.keys.forEach((k, i) => (params[k] = decodeURIComponent(m[i + 1])));
-      return r.h(req, params);
+      return requestContext.run({}, () => r.h(req, params));
     }
     if (pathMatched) return json({ error: 'Método no permitido' }, 405);
     return null;

@@ -4,7 +4,8 @@
 // desde su día/mes de inicio. Desde la ventana también se pueden crear tipos de vacaciones nuevos en TIPOSVACACIONES.
 // Se guarda en PS_CONVENIOS, PS_CONVENIOS_VACACIONES y PS_CONVENIOS_LIMITES (BD de Evalos 8).
 // El mismo archivo exporta el widget del Inicio.
-import { Fragment, useMemo, useState, type FormEvent, type JSX } from 'react';
+import { Fragment, useEffect, useMemo, useState, type FormEvent, type JSX } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   api, ApiError, type EvalosConvenio, type EvalosConvenioPeopleResponse, type EvalosConvenioPerson, type EvalosConveniosResponse, type EvalosOrgKind, type EvalosIncidence,
   type EvalosPeriodSync, type EvalosVacationType, type EvalosVacationTypeCreated, type EvalosVacationTypesInfo
@@ -80,6 +81,16 @@ export default function Convenios() {
   const { data, error, reload } = useConvenios();
   const [q, setQ] = useState('');
   const [edit, setEdit] = useState<EvalosConvenio | 'new' | null>(null);
+  const [params, setParams] = useSearchParams();
+  // Deep-link desde el widget del Inicio: ?new=1 crea uno, ?code=XX abre ese convenio.
+  useEffect(() => {
+    if (!data || data.missing) return;
+    if (params.get('new') === '1') { setEdit('new'); setParams({}, { replace: true }); }
+    else {
+      const code = params.get('code');
+      if (code) { const c = data.convenios.find((x) => x.code === code); if (c) setEdit(c); setParams({}, { replace: true }); }
+    }
+  }, [data, params, setParams]);
   const incName = useMemo(() => new Map((data?.incidences || []).map((i) => [i.code, i.name])), [data]);
   const vacType = useMemo(() => new Map((data?.vacationTypes.items || []).map((t) => [t.code, t])), [data]);
   if (error) return error;
@@ -126,7 +137,7 @@ export default function Convenios() {
                         {c.vacations.map((v, i) => (
                           <span key={i} className="small row" style={{ gap: 6 }} title={vacType.get(v.type)?.name || v.type}>
                             <TypeDot color={vacType.get(v.type)?.color} />
-                            <b className="mono">{v.type}</b> {v.unit === 'H' ? fmtLimit('H', v.minutes || 0) : fmtLimit('D', v.days)} <span className="xs muted">{rangeText(v.day, v.month, endOf(v, v.day, v.month))}</span>
+                            <b className="mono">{v.type}</b> {v.unit === 'H' ? `${fmtLimit('H', v.minutes || 0)} (1 día = ${fmtHours(v.minutesPerDay || HOURS_PER_DAY * 60)} h)` : fmtLimit('D', v.days)} <span className="xs muted">{rangeText(v.day, v.month, endOf(v, v.day, v.month))}</span>
                           </span>
                         ))}
                       </div>
@@ -309,14 +320,18 @@ interface PlusRow { key: number; years: string; text: string }
 /** Límite de incidencia en edición: siempre en horas (HH:MM). fromDays = venía guardado en días. */
 interface LimitRow { key: number; incidence: string; text: string; pluses: PlusRow[]; fromDays?: number }
 /** Periodo de vacaciones en edición: en días (texto con decimales) o en horas (HH:MM). */
-interface VacRow extends End { key: number; type: string; day: number; month: number; unit: 'D' | 'H'; text: string; pluses: PlusRow[] }
-/** Pasa el valor de un periodo o plus a la otra unidad (a 8 h por día); vacío si no se puede leer. */
-function convertText(text: string, from: 'D' | 'H', to: 'D' | 'H') {
+/** dayText: en horas, lo que vale un día de vacaciones (HH:MM, MINUTOSDIA en VACACIONES). */
+interface VacRow extends End { key: number; type: string; day: number; month: number; unit: 'D' | 'H'; text: string; dayText: string; pluses: PlusRow[] }
+/** Pasa el valor de un periodo o plus a la otra unidad (con las horas de un día indicadas); vacío si no se puede leer. */
+function convertText(text: string, from: 'D' | 'H', to: 'D' | 'H', dayMin = HOURS_PER_DAY * 60) {
   if (from === to || !text.trim()) return text;
-  if (to === 'H') { const d = parseDays(text); return d > 0 ? fmtHours(Math.round(d * HOURS_PER_DAY * 60)) : ''; }
+  if (to === 'H') { const d = parseDays(text); return d > 0 ? fmtHours(Math.round(d * dayMin)) : ''; }
   const m = parseHours(text);
-  return m > 0 ? fmtDays(Math.max(0.5, Math.round((m / 60 / HOURS_PER_DAY) * 2) / 2)) : '';
+  return m > 0 ? fmtDays(Math.max(0.5, Math.round((m / dayMin) * 2) / 2)) : '';
 }
+const DEFAULT_DAY_TEXT = fmtHours(HOURS_PER_DAY * 60);
+/** Minutos de un día de vacaciones de un periodo en horas (8 h si no se puede leer). */
+const dayMinutes = (r: VacRow) => parseHours(r.dayText) || HOURS_PER_DAY * 60;
 const toPlusRows = (unit: 'D' | 'H', list?: { years: number; value: number }[]): PlusRow[] =>
   (list || []).map((p) => ({ key: ++rowSeq, years: String(p.years), text: unit === 'D' ? fmtDays(p.value) : fmtHours(p.value) }));
 const plusValue = (unit: 'D' | 'H', p: PlusRow) => ({ years: Number(p.years), value: unit === 'D' ? parseDays(p.text) : parseHours(p.text) });
@@ -345,6 +360,7 @@ function ConvenioModal({ convenio, incidences, vacationTypes, linkable, convenio
   const [name, setName] = useState(convenio?.name || '');
   const [types, setTypes] = useState<EvalosVacationType[]>(vacationTypes.items);
   const [vacRows, setVacRows] = useState<VacRow[]>(() => (convenio?.vacations || []).map((v) => ({ key: ++rowSeq, type: v.type, day: v.day, month: v.month, ...endOf(v, v.day, v.month),
+    dayText: fmtHours(v.minutesPerDay || HOURS_PER_DAY * 60),
     ...(v.unit === 'H' ? { unit: 'H' as const, text: fmtHours(v.minutes || 0), pluses: toPlusRows('H', v.pluses) } : { unit: 'D' as const, text: fmtDays(v.days), pluses: toPlusRows('D', v.pluses) }) })));
   // Filas con los pluses desplegados.
   const [openPlus, setOpenPlus] = useState<Set<number>>(new Set());
@@ -380,17 +396,21 @@ function ConvenioModal({ convenio, incidences, vacationTypes, linkable, convenio
     const t = type || last?.type || types[0]?.code;
     if (!t) return;
     const day = last?.day ?? 1, month = last?.month ?? 1;
-    setVacRows((rs) => [...rs, { key: ++rowSeq, type: t, day, month, ...(last ? endOf(last, day, month) : defaultEnd(day, month)), unit: last?.unit || 'D', text: '', pluses: [] }]);
+    setVacRows((rs) => [...rs, { key: ++rowSeq, type: t, day, month, ...(last ? endOf(last, day, month) : defaultEnd(day, month)), unit: last?.unit || 'D', text: '', dayText: last?.dayText || DEFAULT_DAY_TEXT, pluses: [] }]);
   }
-  /** Cambia un periodo de días a horas o al revés, convirtiendo su valor y sus pluses a 8 h por día. */
+  /** Cambia un periodo de días a horas o al revés, convirtiendo su valor y sus pluses con las horas de un día del periodo. */
   const setVacUnit = (r: VacRow, unit: 'D' | 'H') => setVacRow(r.key, {
-    unit, text: convertText(r.text, r.unit, unit), pluses: r.pluses.map((p) => ({ ...p, text: convertText(p.text, r.unit, unit) }))
+    unit, text: convertText(r.text, r.unit, unit, dayMinutes(r)), pluses: r.pluses.map((p) => ({ ...p, text: convertText(p.text, r.unit, unit, dayMinutes(r)) }))
   });
   function vacError(r: VacRow) {
     if (endError(r.day, r.month, r)) return endError(r.day, r.month, r);
     if (r.pluses.some((p) => plusError(r.unit, p, r.pluses))) return 'Revisa sus pluses';
     if (!r.text.trim()) return r.unit === 'H' ? 'Indica las horas' : 'Indica los días';
-    if (r.unit === 'H') return parseHours(r.text) > 0 ? '' : 'Horas en formato HH:MM (p. ej. 16:00)';
+    if (r.unit === 'H') {
+      if (!(parseHours(r.text) > 0)) return 'Horas en formato HH:MM (p. ej. 16:00)';
+      const d = parseHours(r.dayText);
+      return d > 0 && d <= 24 * 60 ? '' : 'Horas de un día en formato HH:MM (de 00:01 a 24:00)';
+    }
     const n = parseDays(r.text);
     return !(n > 0 && n <= 365) ? 'De 0,5 a 365 días' : Number.isInteger(n * 2) ? '' : 'Solo medios días (p. ej. 22,5)';
   }
@@ -423,7 +443,7 @@ function ConvenioModal({ convenio, incidences, vacationTypes, linkable, convenio
     const payload = {
       code, name,
       vacations: vacRows.map((r) => ({ type: r.type, day: r.day, month: r.month, endDay: r.endDay, endMonth: r.endMonth, endNextYear: r.endNextYear,
-        ...(r.unit === 'H' ? { unit: 'H', days: 0, minutes: parseHours(r.text) } : { unit: 'D', days: parseDays(r.text) }), pluses: r.pluses.map((p) => plusValue(r.unit, p)) })),
+        ...(r.unit === 'H' ? { unit: 'H', days: 0, minutes: parseHours(r.text), minutesPerDay: dayMinutes(r) } : { unit: 'D', days: parseDays(r.text) }), pluses: r.pluses.map((p) => plusValue(r.unit, p)) })),
       incidenceDay: inc.day, incidenceMonth: inc.month, incidenceEndDay: inc.endDay, incidenceEndMonth: inc.endMonth, incidenceEndNextYear: inc.endNextYear,
       limits: rows.map((r) => ({ incidence: r.incidence, unit: 'H', value: parseHours(r.text), pluses: r.pluses.map((p) => plusValue('H', p)) })),
       // Solo si se ha tocado la lista de personas (si no, el servidor no cambia EM_CONV).
@@ -522,7 +542,7 @@ function ConvenioModal({ convenio, incidences, vacationTypes, linkable, convenio
                       </td>
                       <td>
                         <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
-                          <input className="input" style={{ width: 66 }} inputMode={r.unit === 'D' ? 'decimal' : 'text'} value={r.text} disabled={ro} placeholder={r.unit === 'D' ? '22' : 'HH:MM'}
+                          <input className="input" style={{ width: r.unit === 'H' ? 84 : 66 }} inputMode={r.unit === 'D' ? 'decimal' : 'text'} value={r.text} disabled={ro} placeholder={r.unit === 'D' ? '22' : 'HH:MM'}
                             aria-label={r.unit === 'D' ? `Días de ${r.type}` : `Horas de ${r.type}`} aria-invalid={!!err} onChange={(e) => setVacRow(r.key, { text: e.target.value })} />
                           <select className="select" style={{ width: 90 }} aria-label={`Unidad del periodo de ${r.type}`} value={r.unit} disabled={ro}
                             title="El periodo se genera en VACACIONES en días o en horas" onChange={(e) => setVacUnit(r, e.target.value === 'H' ? 'H' : 'D')}>
@@ -530,6 +550,14 @@ function ConvenioModal({ convenio, incidences, vacationTypes, linkable, convenio
                             <option value="H">horas</option>
                           </select>
                         </div>
+                        {r.unit === 'H' && (
+                          <label className="row xs muted" style={{ gap: 6, marginTop: 6, flexWrap: 'nowrap' }} title="Horas que se asignan al poner un día de vacaciones de este tipo (MINUTOSDIA en VACACIONES)">
+                            <span style={{ whiteSpace: 'nowrap' }}>1 día =</span>
+                            <input className="input" style={{ width: 66 }} value={r.dayText} disabled={ro} placeholder="08:00" aria-label={`Horas de un día de vacaciones de ${r.type}`}
+                              onChange={(e) => setVacRow(r.key, { dayText: e.target.value })} />
+                            <span>h</span>
+                          </label>
+                        )}
                         {err && <div className="xs" style={{ color: 'var(--bad)' }}>{err}</div>}
                       </td>
                       <td><PlusToggle unit={r.unit} pluses={r.pluses} open={openPlus.has(r.key)} onToggle={() => togglePlus(r.key)} ro={ro} /></td>
@@ -902,21 +930,39 @@ function ConvenioPeople({ people, org, error, members, ro, current, saved, conve
 }
 
 // ---------- Widget ----------
+const ChevR = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>;
+
 export function ConveniosWidget() {
   const { data, error } = useConvenios();
   if (error) return error;
   if (!data) return <Loading />;
-  if (data.missing) return <span className="small muted">Falta crear las tablas de convenios en la base de datos de Evalos 8. Abre la pantalla Convenios para ver el script.</span>;
+  if (data.missing) return <Link to="/evalos/convenios" className="small muted">Falta crear las tablas de convenios en Evalos 8. Abre la pantalla para ver el script →</Link>;
+  // Lo accionable primero: convenios sin personas o sin límites definidos.
+  const issue = (c: typeof data.convenios[number]) => (!(c.employees ?? 0) ? 'Sin personas' : !c.limits.length ? 'Sin límites' : null);
+  const ranked = [...data.convenios].sort((a, b) => (issue(a) ? 0 : 1) - (issue(b) ? 0 : 1));
+  const needReview = data.convenios.filter(issue).length;
   return (
-    <div className="col" style={{ gap: 10 }}>
-      <div className="card" style={{ gap: 2, padding: '12px 14px' }}><span className="xs muted" style={{ fontWeight: 600 }}>Convenios</span><span className="stat">{data.convenios.length}</span></div>
-      <div className="col" style={{ gap: 4 }}>
-        {data.convenios.slice(0, 4).map((c) => (
-          <div key={c.code} className="row" style={{ justifyContent: 'space-between', fontSize: 13, gap: 8 }}>
-            <span><b className="mono">{c.code}</b> {c.name}</span>
-            <span className="muted xs" style={{ whiteSpace: 'nowrap' }}>{c.employees ?? 0} persona(s) · {c.limits.length} límite(s)</span>
-          </div>
-        ))}
+    <div className="col" style={{ gap: 12 }}>
+      <div className="row" style={{ gap: 10 }}>
+        <div className="ev-mini grow"><span className="xs muted" style={{ fontWeight: 600 }}>Convenios</span><b>{data.convenios.length}</b></div>
+        <div className={`ev-mini grow${needReview ? ' alert' : ''}`}><span className="xs muted" style={{ fontWeight: 600 }}>Necesitan repaso</span><b>{needReview}</b></div>
+      </div>
+      <div className="w-list">
+        {ranked.slice(0, 4).map((c) => {
+          const tag = issue(c);
+          return (
+            <Link key={c.code} to={`/evalos/convenios?code=${encodeURIComponent(c.code)}`} className="w-row">
+              <span className="w-row-main"><b>{c.name}</b><span className="xs muted"><span className="mono">{c.code}</span> · {c.employees ?? 0} persona(s) · {c.limits.length} límite(s)</span></span>
+              {tag && <span className="tag warn">{tag}</span>}
+              <span className="chev-r"><ChevR /></span>
+            </Link>
+          );
+        })}
+        {!data.convenios.length && <div className="w-empty">Aún no hay convenios.</div>}
+      </div>
+      <div className="w-quick">
+        {data.canEdit && <Link to="/evalos/convenios?new=1"><Icon.plus /> Nuevo convenio</Link>}
+        <Link to="/evalos/convenios"><Icon.ext /> Abrir convenios</Link>
       </div>
     </div>
   );
