@@ -4,6 +4,7 @@
 // Sin conexión (modo demostración) trabaja sobre el motor de demostración; con conexión real, la vista de Marcajes
 // se alimenta de la API REST de Evalos 8: anomalías del listado PS_ANOMA y marcajes de Booking/attendance.
 import { useEffect, useMemo, useState, type FormEvent, type JSX } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   api, ApiError, type EvalosCorreccionesResponse, type EvalosMarcaje, type EvalosMarcajePunch,
   type EvalosRestMarcaje, type EvalosRestMarcajesResponse, type EvalosBookingRef, type EvalosDayInfo, type EvalosIncidencia, type EvalosEmployeeBrief, type EvalosOrgKey
@@ -32,9 +33,18 @@ type Tab = 'marcajes' | 'solicitudes' | 'ausencias';
 
 export default function Correcciones() {
   const { data, error, reload } = useCorrecciones();
-  const [tab, setTab] = useState<Tab>('marcajes');
+  const [params, setParams] = useSearchParams();
+  const validTab = (t: string | null): t is Tab => ['marcajes', 'solicitudes', 'ausencias'].includes(t || '');
+  const [tab, setTab] = useState<Tab>(validTab(params.get('tab')) ? (params.get('tab') as Tab) : 'marcajes');
   const [editM, setEditM] = useState<EvalosMarcaje | null>(null);
   const toast = useToast();
+  // Deep-link desde el widget del Inicio: ?tab=… y ?open=<id de marcaje>.
+  useEffect(() => {
+    if (!data || data.mode === 'rest') return;
+    const open = params.get('open');
+    if (open) { const m = data.marcajes.find((x) => x.id === open); if (m) setEditM(m); }
+    if (params.get('tab') || open) setParams({}, { replace: true });
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (error) return error;
   if (!data) return <Loading />;
@@ -664,15 +674,29 @@ function VacacionesDia({ marcaje, onSaved }: { marcaje: EvalosRestMarcaje; onSav
   );
 }
 
+const ChevR = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>;
+
 function CorreccionesRestWidget() {
   const { data, error } = useData(() => api.get<EvalosRestMarcajesResponse>(qs(mondayOfWeek(), isoLocal(new Date()), '')));
   if (error) return <ErrorBox error={error} />;
   if (!data) return <Loading />;
-  const incidencias = data.marcajes.filter((m) => m.status === 'INCIDENCIA').length;
+  const anomalias = data.marcajes.filter((m) => m.status === 'INCIDENCIA');
   return (
-    <div className="row" style={{ gap: 10 }}>
-      <div className="card grow" style={{ gap: 2, padding: '12px 14px' }}><span className="xs muted" style={{ fontWeight: 600 }}>Días con anomalías (esta semana)</span><span className="stat">{incidencias}</span></div>
-      <div className="card grow" style={{ gap: 2, padding: '12px 14px' }}><span className="xs muted" style={{ fontWeight: 600 }}>Días con marcajes</span><span className="stat">{data.marcajes.filter((m) => m.punches.length).length}</span></div>
+    <div className="col" style={{ gap: 12 }}>
+      <div className="row" style={{ gap: 10 }}>
+        <div className={`ev-mini grow${anomalias.length ? ' alert' : ''}`}><span className="xs muted" style={{ fontWeight: 600 }}>Anomalías esta semana</span><b>{anomalias.length}</b></div>
+        <div className="ev-mini grow"><span className="xs muted" style={{ fontWeight: 600 }}>Días con marcajes</span><b>{data.marcajes.filter((m) => m.punches.length).length}</b></div>
+      </div>
+      <div className="w-list">
+        {anomalias.slice(0, 3).map((m) => (
+          <Link key={m.id} to={`/evalos/correcciones?tab=marcajes&open=${encodeURIComponent(m.id)}`} className="w-row">
+            <span className="w-row-main"><b>{m.employeeName || m.employee}</b><span className="xs muted">{fmtDate(m.date)} · {m.issues[0] || 'Anomalía'}</span></span>
+            <span className="chev-r"><ChevR /></span>
+          </Link>
+        ))}
+        {!anomalias.length && <div className="w-empty"><Icon.ok /> Sin anomalías esta semana.</div>}
+      </div>
+      <div className="w-quick"><Link to="/evalos/correcciones?tab=marcajes"><Icon.ext /> Revisar marcajes</Link></div>
     </div>
   );
 }
@@ -684,11 +708,27 @@ export function CorreccionesWidget() {
   if (!data) return <Loading />;
   if (data.mode === 'rest') return <CorreccionesRestWidget />;
   const incidencias = data.marcajes.filter((m) => m.status === 'INCIDENCIA').length;
-  const pendientes = data.solicitudes.filter((s) => s.status === 'PENDIENTE').length;
+  const pendientes = data.solicitudes.filter((s) => s.status === 'PENDIENTE');
   return (
-    <div className="row" style={{ gap: 10 }}>
-      <div className="card grow" style={{ gap: 2, padding: '12px 14px' }}><span className="xs muted" style={{ fontWeight: 600 }}>Marcajes con incidencia</span><span className="stat">{incidencias}</span></div>
-      <div className="card grow" style={{ gap: 2, padding: '12px 14px' }}><span className="xs muted" style={{ fontWeight: 600 }}>Solicitudes pendientes</span><span className="stat">{pendientes}</span></div>
+    <div className="col" style={{ gap: 12 }}>
+      <div className="row" style={{ gap: 10 }}>
+        <div className={`ev-mini grow${pendientes.length ? ' alert' : ''}`}><span className="xs muted" style={{ fontWeight: 600 }}>Solicitudes pendientes</span><b>{pendientes.length}</b></div>
+        <div className={`ev-mini grow${incidencias ? ' alert' : ''}`}><span className="xs muted" style={{ fontWeight: 600 }}>Marcajes con incidencia</span><b>{incidencias}</b></div>
+      </div>
+      <div className="w-list">
+        {pendientes.slice(0, 3).map((s) => (
+          <Link key={s.id} to="/evalos/correcciones?tab=solicitudes" className="w-row">
+            <span className="w-row-main"><b>{s.employeeName}</b><span className="xs muted">{s.type} · {fmtDate(s.from)}{s.to !== s.from ? ` – ${fmtDate(s.to)}` : ''} · {s.days} día(s)</span></span>
+            <span className="tag warn">Pendiente</span>
+            <span className="chev-r"><ChevR /></span>
+          </Link>
+        ))}
+        {!pendientes.length && <div className="w-empty"><Icon.ok /> No hay solicitudes pendientes.</div>}
+      </div>
+      <div className="w-quick">
+        <Link to="/evalos/correcciones?tab=solicitudes"><Icon.ext /> Solicitudes</Link>
+        <Link to="/evalos/correcciones?tab=marcajes"><Icon.edit /> Marcajes</Link>
+      </div>
     </div>
   );
 }

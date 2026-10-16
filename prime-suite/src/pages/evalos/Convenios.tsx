@@ -4,7 +4,8 @@
 // desde su día/mes de inicio. Desde la ventana también se pueden crear tipos de vacaciones nuevos en TIPOSVACACIONES.
 // Se guarda en PS_CONVENIOS, PS_CONVENIOS_VACACIONES y PS_CONVENIOS_LIMITES (BD de Evalos 8).
 // El mismo archivo exporta el widget del Inicio.
-import { Fragment, useMemo, useState, type FormEvent, type JSX } from 'react';
+import { Fragment, useEffect, useMemo, useState, type FormEvent, type JSX } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   api, ApiError, type EvalosConvenio, type EvalosConvenioPeopleResponse, type EvalosConvenioPerson, type EvalosConveniosResponse, type EvalosOrgKind, type EvalosIncidence,
   type EvalosPeriodSync, type EvalosVacationType, type EvalosVacationTypeCreated, type EvalosVacationTypesInfo
@@ -80,6 +81,16 @@ export default function Convenios() {
   const { data, error, reload } = useConvenios();
   const [q, setQ] = useState('');
   const [edit, setEdit] = useState<EvalosConvenio | 'new' | null>(null);
+  const [params, setParams] = useSearchParams();
+  // Deep-link desde el widget del Inicio: ?new=1 crea uno, ?code=XX abre ese convenio.
+  useEffect(() => {
+    if (!data || data.missing) return;
+    if (params.get('new') === '1') { setEdit('new'); setParams({}, { replace: true }); }
+    else {
+      const code = params.get('code');
+      if (code) { const c = data.convenios.find((x) => x.code === code); if (c) setEdit(c); setParams({}, { replace: true }); }
+    }
+  }, [data, params, setParams]);
   const incName = useMemo(() => new Map((data?.incidences || []).map((i) => [i.code, i.name])), [data]);
   const vacType = useMemo(() => new Map((data?.vacationTypes.items || []).map((t) => [t.code, t])), [data]);
   if (error) return error;
@@ -919,21 +930,39 @@ function ConvenioPeople({ people, org, error, members, ro, current, saved, conve
 }
 
 // ---------- Widget ----------
+const ChevR = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>;
+
 export function ConveniosWidget() {
   const { data, error } = useConvenios();
   if (error) return error;
   if (!data) return <Loading />;
-  if (data.missing) return <span className="small muted">Falta crear las tablas de convenios en la base de datos de Evalos 8. Abre la pantalla Convenios para ver el script.</span>;
+  if (data.missing) return <Link to="/evalos/convenios" className="small muted">Falta crear las tablas de convenios en Evalos 8. Abre la pantalla para ver el script →</Link>;
+  // Lo accionable primero: convenios sin personas o sin límites definidos.
+  const issue = (c: typeof data.convenios[number]) => (!(c.employees ?? 0) ? 'Sin personas' : !c.limits.length ? 'Sin límites' : null);
+  const ranked = [...data.convenios].sort((a, b) => (issue(a) ? 0 : 1) - (issue(b) ? 0 : 1));
+  const needReview = data.convenios.filter(issue).length;
   return (
-    <div className="col" style={{ gap: 10 }}>
-      <div className="card" style={{ gap: 2, padding: '12px 14px' }}><span className="xs muted" style={{ fontWeight: 600 }}>Convenios</span><span className="stat">{data.convenios.length}</span></div>
-      <div className="col" style={{ gap: 4 }}>
-        {data.convenios.slice(0, 4).map((c) => (
-          <div key={c.code} className="row" style={{ justifyContent: 'space-between', fontSize: 13, gap: 8 }}>
-            <span><b className="mono">{c.code}</b> {c.name}</span>
-            <span className="muted xs" style={{ whiteSpace: 'nowrap' }}>{c.employees ?? 0} persona(s) · {c.limits.length} límite(s)</span>
-          </div>
-        ))}
+    <div className="col" style={{ gap: 12 }}>
+      <div className="row" style={{ gap: 10 }}>
+        <div className="ev-mini grow"><span className="xs muted" style={{ fontWeight: 600 }}>Convenios</span><b>{data.convenios.length}</b></div>
+        <div className={`ev-mini grow${needReview ? ' alert' : ''}`}><span className="xs muted" style={{ fontWeight: 600 }}>Necesitan repaso</span><b>{needReview}</b></div>
+      </div>
+      <div className="w-list">
+        {ranked.slice(0, 4).map((c) => {
+          const tag = issue(c);
+          return (
+            <Link key={c.code} to={`/evalos/convenios?code=${encodeURIComponent(c.code)}`} className="w-row">
+              <span className="w-row-main"><b>{c.name}</b><span className="xs muted"><span className="mono">{c.code}</span> · {c.employees ?? 0} persona(s) · {c.limits.length} límite(s)</span></span>
+              {tag && <span className="tag warn">{tag}</span>}
+              <span className="chev-r"><ChevR /></span>
+            </Link>
+          );
+        })}
+        {!data.convenios.length && <div className="w-empty">Aún no hay convenios.</div>}
+      </div>
+      <div className="w-quick">
+        {data.canEdit && <Link to="/evalos/convenios?new=1"><Icon.plus /> Nuevo convenio</Link>}
+        <Link to="/evalos/convenios"><Icon.ext /> Abrir convenios</Link>
       </div>
     </div>
   );
