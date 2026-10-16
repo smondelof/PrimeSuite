@@ -81,6 +81,8 @@ function sanitizePluses(raw: unknown, unit: 'D' | 'H', what: string): ConvenioPl
 
 /** Horas de un día al pasar a horas los límites que se guardaron en días (versión anterior). */
 export const LIMIT_HOURS_PER_DAY = 8;
+/** Minutos de un día de vacaciones en los periodos en horas si no se indica otra cosa (8 h). */
+export const DEFAULT_MINUTES_PER_DAY = 480;
 
 /**
  * Valida y normaliza un convenio recibido de la interfaz.
@@ -117,7 +119,11 @@ export function sanitizeConvenio(b: any, opts: { uppercase: boolean; incidences?
       const minutes = num(v?.minutes);
       if (!Number.isInteger(minutes) || minutes <= 0 || minutes > MAX_VACATION_MINUTES)
         throw new HttpError(400, `Las horas de vacaciones de ${type} deben ser una cantidad mayor que 00:00`);
-      return { type, day, month, ...end, unit, days: 0, minutes, pluses: sanitizePluses(v?.pluses, 'H', `el periodo de ${type}`) };
+      // Cuántas horas es un día de vacaciones (MINUTOSDIA de VACACIONES): al asignar un día se asignan esas horas.
+      const mpd = v?.minutesPerDay == null || v?.minutesPerDay === '' ? DEFAULT_MINUTES_PER_DAY : num(v.minutesPerDay);
+      if (!Number.isInteger(mpd) || mpd <= 0 || mpd > 24 * 60)
+        throw new HttpError(400, `Las horas de un día de vacaciones de ${type} deben estar entre 00:01 y 24:00`);
+      return { type, day, month, ...end, unit, days: 0, minutes, minutesPerDay: mpd, pluses: sanitizePluses(v?.pluses, 'H', `el periodo de ${type}`) };
     }
     const days = num(v?.days);
     if (!Number.isFinite(days) || days <= 0 || days > MAX_VACATION_DAYS || !halfDays(days))
@@ -173,6 +179,7 @@ export function conveniosSql(schema = 'dbo') {
 --   CA_UNID  D = periodo en días, H = periodo en horas (sin valor: en días)
 --   CA_DIAS  días de vacaciones del periodo (admite medios días; solo en días)
 --   CA_MINU  horas de vacaciones del periodo, en minutos (8:30 h = 510; solo en horas)
+--   CA_MDIA  minutos de un día de vacaciones (solo en horas; sin valor: 480 = 8 h). Va a VACACIONES.MINUTOSDIA
 --
 -- ${LIMITES_TABLE}: límites de incidencia de cada convenio (una fila por incidencia).
 --   CL_CONV  código del convenio (${CONVENIOS_TABLE}.CV_CODI; se borra con el convenio)
@@ -238,6 +245,10 @@ BEGIN
       (ISNULL(CA_UNID, ''D'') = ''D'' AND CA_DIAS > 0 AND CA_DIAS <= ${MAX_VACATION_DAYS} AND CA_MINU IS NULL) OR
       (CA_UNID = ''H'' AND CA_MINU > 0 AND CA_DIAS IS NULL));');
 END;
+
+-- Horas de un día de vacaciones en los periodos en horas.
+IF COL_LENGTH(N'${s}.[${VACACIONES_TABLE}]', N'CA_MDIA') IS NULL
+  ALTER TABLE ${s}.[${VACACIONES_TABLE}] ADD CA_MDIA int NULL;
 
 -- Tabla creada con una versión anterior del script (un solo periodo por tipo): se numeran los periodos.
 IF COL_LENGTH(N'${s}.[${VACACIONES_TABLE}]', N'CA_LINE') IS NULL

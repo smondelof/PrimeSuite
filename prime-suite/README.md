@@ -188,7 +188,8 @@ Si un dashboard solo tiene URL directa (sin UUID), se muestra en un iframe plano
     - Periodo en curso: el último que ha empezado (con su inicio y fin); si ya terminó, el siguiente. Si el alta cae dentro, empieza en la fecha de alta y se prorratea: vacaciones al medio día, límites al minuto.
     - Se suma el plus del tramo de antigüedad más alto alcanzado al inicio del periodo.
     - Periodo en días: `PERIODOENDIAS` 1, `TOTALDIAS` con los días y `TOTALHORAS` = días × 8 h (provisional).
-    - Periodo en horas: `PERIODOENDIAS` 0, `TOTALDIAS` 0 y `TOTALHORAS` con las horas (con decimales: 16:30 h = 16,5). Se prorratea al minuto.
+    - Periodo en horas, como lo graba Evalos: `PERIODOENDIAS` 0, `TOTALDIAS` con el total **en minutos** (150 h = 9000), `MINUTOSDIA` con lo que vale un día de vacaciones y `TOTALHORAS` 0. Se prorratea al minuto. Las filas grabadas por la versión anterior (horas en `TOTALHORAS`) se corrigen al volver a guardar el convenio.
+    - Cada periodo en horas tiene **«1 día = HH:MM»** (por defecto 08:00, columna `CA_MDIA`): son las horas que se asignan al poner un día de vacaciones de ese tipo. En Correcciones se proponen esas horas al elegir un tipo en horas.
     - Una fila existente se actualiza sin tocar lo disfrutado; quitar a alguien del convenio no borra sus periodos.
     - *Generar periodos del año siguiente* crea los del periodo siguiente.
     - Se avisa, en el convenio y en la ficha, cuando lo disfrutado supera lo disponible.

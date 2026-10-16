@@ -8,8 +8,8 @@ import {
   type WorkflowColumns, type WorkflowPlan, type WorkflowRow
 } from './types.ts';
 import { LEGACY_PERFILES_TABLE, WF_PERFILES_TABLE, WF_ROLE_COLUMN, WF_VALIDA_TABLE, roleFromDb, roleToDb, workflowSql } from './workflow.ts';
-import { defaultEnd } from './convperiods.ts';
-import { CONVENIOS_TABLE, CONVENIO_CODE_MAX, LIMITES_TABLE, LIMIT_HOURS_PER_DAY, PLUSES_TABLE, VACACIONES_TABLE, VACATION_TYPE_DEFAULTS, conveniosSql, detectColorFormat, encodeColor, vacationTypeDefault } from './convenios.ts';
+import { defaultEnd, readVacationColumns, vacationColumns } from './convperiods.ts';
+import { CONVENIOS_TABLE, CONVENIO_CODE_MAX, LIMITES_TABLE, LIMIT_HOURS_PER_DAY, DEFAULT_MINUTES_PER_DAY, PLUSES_TABLE, VACACIONES_TABLE, VACATION_TYPE_DEFAULTS, conveniosSql, detectColorFormat, encodeColor, vacationTypeDefault } from './convenios.ts';
 import { HISTORY, HISTORY_KINDS, ORG_KINDS, checkEndChange, checkReadmit, cardDescription, dmy, madridNow, nextCode, prevDay, toEntry, ymdOf, type HistoryDef } from './history.ts';
 import { logEvalosCall } from './calllog.ts';
 
@@ -1040,6 +1040,7 @@ export class SqlServerDriver implements EvalosDriver {
       if (!(await hasCol(vac, 'CA_LINE'))) return `${VACACIONES_TABLE} es de una versión anterior (un solo periodo por tipo)`;
       if (!(await hasCol(conv, 'CV_IFDI')) || !(await hasCol(vac, 'CA_FDIA'))) return `Faltan las columnas de fin de periodo (CV_IFDI… en ${CONVENIOS_TABLE}, CA_FDIA… en ${VACACIONES_TABLE})`;
       if (!(await hasCol(vac, 'CA_UNID'))) return `Faltan las columnas de periodos en horas (CA_UNID y CA_MINU en ${VACACIONES_TABLE})`;
+      if (!(await hasCol(vac, 'CA_MDIA'))) return `Falta la columna de horas por día de los periodos en horas (CA_MDIA en ${VACACIONES_TABLE})`;
       return null;
     }, () => conveniosSql(schema || 'dbo'), 'las tablas de convenios', 'convenios_missing');
     return { conv, vac, lim, plus };
@@ -1083,7 +1084,7 @@ export class SqlServerDriver implements EvalosDriver {
     const { conv, vac, lim, plus } = await this.conveniosTables();
     const [{ rows: cv }, { rows: ca }, { rows: cl }, { rows: cp }] = await Promise.all([
       this.query(`SELECT RTRIM(CV_CODI) AS code, RTRIM(CV_DESC) AS name, CV_IDIA AS id, CV_IMES AS im, CV_IFDI AS ifd, CV_IFME AS ifm, CV_IFAN AS ifa FROM ${tableRef(conv)} ORDER BY CV_CODI`),
-      this.query(`SELECT RTRIM(CA_CONV) AS conv, CA_LINE AS line, CA_FDIA AS fd, CA_FMES AS fm, CA_FANO AS fa, RTRIM(CA_TVAC) AS tvac, CA_VDIA AS vd, CA_VMES AS vm, UPPER(CA_UNID) AS unit, CA_DIAS AS dias, CA_MINU AS minu FROM ${tableRef(vac)} ORDER BY CA_CONV, CA_LINE`),
+      this.query(`SELECT RTRIM(CA_CONV) AS conv, CA_LINE AS line, CA_FDIA AS fd, CA_FMES AS fm, CA_FANO AS fa, RTRIM(CA_TVAC) AS tvac, CA_VDIA AS vd, CA_VMES AS vm, UPPER(CA_UNID) AS unit, CA_DIAS AS dias, CA_MINU AS minu, CA_MDIA AS mdia FROM ${tableRef(vac)} ORDER BY CA_CONV, CA_LINE`),
       this.query(`SELECT RTRIM(CL_CONV) AS conv, RTRIM(CL_INCI) AS inci, UPPER(CL_UNID) AS unit, CL_DIAS AS dias, CL_MINU AS minu FROM ${tableRef(lim)} ORDER BY CL_CONV, CL_INCI`),
       this.query(`SELECT RTRIM(CP_CONV) AS conv, UPPER(CP_TIPO) AS tipo, RTRIM(CP_REF) AS ref, CP_ANOS AS anos, CP_DIAS AS dias, CP_MINU AS minu FROM ${tableRef(plus)} ORDER BY CP_CONV, CP_TIPO, CP_REF, CP_ANOS`)
     ]);
@@ -1103,7 +1104,7 @@ export class SqlServerDriver implements EvalosDriver {
       ? { endDay: Number(d), endMonth: Number(m), endNextYear: a === true || Number(a) === 1 } : defaultEnd(day, month));
     // Periodo en días (CA_UNID D o sin valor) o en horas (CA_UNID H, CA_MINU en minutos).
     const vacations = group(ca as any[], (r) => ({ type: txt(r.tvac), day: Number(r.vd) || 1, month: Number(r.vm) || 1, ...end(r.fd, r.fm, r.fa, Number(r.vd) || 1, Number(r.vm) || 1),
-      ...(txt(r.unit) === 'H' ? { unit: 'H' as const, days: 0, minutes: Number(r.minu) || 0 } : { unit: 'D' as const, days: Number(r.dias) || 0 }),
+      ...(txt(r.unit) === 'H' ? { unit: 'H' as const, days: 0, minutes: Number(r.minu) || 0, minutesPerDay: Number(r.mdia) || DEFAULT_MINUTES_PER_DAY } : { unit: 'D' as const, days: Number(r.dias) || 0 }),
       pluses: pluses.get(`${txt(r.conv)}|V|${txt(r.line)}`) || [] }));
     const limits = group(cl as any[], (r) => {
       // Siempre en horas. Los límites guardados en días (versión anterior) se pasan a minutos a 8 h por día.
@@ -1197,9 +1198,9 @@ export class SqlServerDriver implements EvalosDriver {
       for (const [i, v] of c.vacations.entries()) {
         const ve = v.endDay && v.endMonth ? { endDay: v.endDay, endMonth: v.endMonth, endNextYear: !!v.endNextYear } : defaultEnd(v.day, v.month);
         const hours = v.unit === 'H';
-        await q(`INSERT INTO ${tableRef(vac)} (CA_CONV, CA_LINE, CA_TVAC, CA_VDIA, CA_VMES, CA_FDIA, CA_FMES, CA_FANO, CA_UNID, CA_DIAS, CA_MINU) VALUES (@code, @line, @tvac, @vd, @vm, @fd, @fm, @fa, @unit, @dias, @minu)`,
+        await q(`INSERT INTO ${tableRef(vac)} (CA_CONV, CA_LINE, CA_TVAC, CA_VDIA, CA_VMES, CA_FDIA, CA_FMES, CA_FANO, CA_UNID, CA_DIAS, CA_MINU, CA_MDIA) VALUES (@code, @line, @tvac, @vd, @vm, @fd, @fm, @fa, @unit, @dias, @minu, @mdia)`,
           { code: c.code, line: i + 1, tvac: v.type, vd: v.day, vm: v.month, fd: ve.endDay, fm: ve.endMonth, fa: ve.endNextYear ? 1 : 0,
-            unit: hours ? 'H' : 'D', dias: hours ? null : v.days, minu: hours ? v.minutes ?? 0 : null });
+            unit: hours ? 'H' : 'D', dias: hours ? null : v.days, minu: hours ? v.minutes ?? 0 : null, mdia: hours ? v.minutesPerDay || DEFAULT_MINUTES_PER_DAY : null });
         for (const p of v.pluses || []) await insPlus('V', String(i + 1), hours ? 'H' : 'D', [p]);
       }
       for (const l of c.limits) {
@@ -1390,16 +1391,23 @@ export class SqlServerDriver implements EvalosDriver {
 
   async upsertVacationPeriods(rows: VacationPeriodRow[], stamp: ChangeStamp) {
     const ymd = (d: string) => d.replace(/-/g, '');
-    return this.upsertPeriodRows('VACACIONES', rows.map((r) => ({
-      // Con prevFrom (corrección de la fecha de alta) se busca por la FECHAINICIO antigua y se cambia a la nueva.
-      key: [[['CODIGO'], 'text', r.employee], [['VACACIONES'], 'text', r.type], [['FECHAINICIO', 'FECHAINCIO'], 'date', ymd(r.prevFrom || r.from)]],
-      update: [...(r.prevFrom ? [[['FECHAINICIO', 'FECHAINCIO'], 'date', ymd(r.from)] as [string[], 'date', string]] : []), [['FECHAFIN'], 'date', ymd(r.to)], [['TOTALDIAS'], 'num', r.days], [['TOTALHORAS'], 'num', r.hours],
-        [['PERIODOENDIAS'], 'num', r.unit === 'H' ? 0 : 1], [['FECHA'], 'date', stamp.date], [['HORA'], 'time', stamp.time], [['USUARIO'], 'text', stamp.user]],
-      insert: [[['FECHAFIN'], 'date', ymd(r.to)], [['TOTALDIAS'], 'num', r.days], [['DIASASIGNADOS'], 'num', 0],
-        [['FECHA'], 'date', stamp.date], [['HORA'], 'time', stamp.time], [['USUARIO'], 'text', stamp.user],
-        [['MINUTOSDIA'], 'num', 0], [['PERIODOENDIAS'], 'num', r.unit === 'H' ? 0 : 1], [['TRIENIOSAPLICADOS'], 'num', 0], [['QUINQUENIOSAPLICADOS'], 'num', 0],
-        [['TOTALHORAS'], 'num', r.hours], [['HORASASIGNADAS'], 'num', 0]]
-    })));
+    return this.upsertPeriodRows('VACACIONES', rows.map((r) => {
+      // Como lo graba Evalos 8:
+      //  - en días:  PERIODOENDIAS 1, TOTALDIAS = días, TOTALHORAS = días × 8 (provisional), MINUTOSDIA 0;
+      //  - en horas: PERIODOENDIAS 0, TOTALDIAS = total en MINUTOS (150 h = 9000), MINUTOSDIA = minutos de un día, TOTALHORAS 0.
+      const inHours = r.unit === 'H';
+      const v = vacationColumns(r);
+      const values: [string[], 'num', number][] = [[['TOTALDIAS'], 'num', v.totalDias], [['TOTALHORAS'], 'num', v.totalHoras], [['MINUTOSDIA'], 'num', v.minutosDia], [['PERIODOENDIAS'], 'num', inHours ? 0 : 1]];
+      return {
+        // Con prevFrom (corrección de la fecha de alta) se busca por la FECHAINICIO antigua y se cambia a la nueva.
+        key: [[['CODIGO'], 'text', r.employee], [['VACACIONES'], 'text', r.type], [['FECHAINICIO', 'FECHAINCIO'], 'date', ymd(r.prevFrom || r.from)]] as [string[], 'date' | 'text', string][],
+        update: [...(r.prevFrom ? [[['FECHAINICIO', 'FECHAINCIO'], 'date', ymd(r.from)] as [string[], 'date', string]] : []), [['FECHAFIN'], 'date', ymd(r.to)] as [string[], 'date', string], ...values,
+          [['FECHA'], 'date', stamp.date], [['HORA'], 'time', stamp.time], [['USUARIO'], 'text', stamp.user]] as [string[], 'date' | 'time' | 'num' | 'text', string | number | null][],
+        insert: [[['FECHAFIN'], 'date', ymd(r.to)], ...values, [['DIASASIGNADOS'], 'num', 0],
+          [['FECHA'], 'date', stamp.date], [['HORA'], 'time', stamp.time], [['USUARIO'], 'text', stamp.user],
+          [['TRIENIOSAPLICADOS'], 'num', 0], [['QUINQUENIOSAPLICADOS'], 'num', 0], [['HORASASIGNADAS'], 'num', 0]] as [string[], 'date' | 'time' | 'num' | 'text', string | number | null][]
+      };
+    }));
   }
 
   async upsertIncidenceLimits(rows: IncidenceLimitRow[]) {
@@ -1454,9 +1462,9 @@ export class SqlServerDriver implements EvalosDriver {
     };
     const n = (v: unknown) => Number(String(v ?? '').trim().replace(',', '.')) || 0;
     for (const r of await read('VACACIONES', [['emp', ['CODIGO']], ['type', ['VACACIONES']], ['f', ['FECHAINICIO', 'FECHAINCIO']], ['t', ['FECHAFIN']],
-      ['days', ['TOTALDIAS']], ['hours', ['TOTALHORAS']], ['ad', ['DIASASIGNADOS']], ['ah', ['HORASASIGNADAS']], ['pd', ['PERIODOENDIAS']]])) {
-      const unit: 'D' | 'H' = String(r.pd ?? '1').trim() === '0' ? 'H' : 'D';
-      vacations.push({ employee: txt(r.emp), type: txt(r.type), from: isoFromDb(r.f), to: isoFromDb(r.t), unit, days: n(r.days), hours: n(r.hours), assignedDays: n(r.ad), assignedHours: n(r.ah) });
+      ['days', ['TOTALDIAS']], ['hours', ['TOTALHORAS']], ['ad', ['DIASASIGNADOS']], ['ah', ['HORASASIGNADAS']], ['pd', ['PERIODOENDIAS']], ['mpd', ['MINUTOSDIA']]])) {
+      vacations.push({ employee: txt(r.emp), type: txt(r.type), from: isoFromDb(r.f), to: isoFromDb(r.t),
+        ...readVacationColumns({ pd: r.pd, totalDias: n(r.days), totalHoras: n(r.hours), diasAsignados: n(r.ad), horasAsignadas: n(r.ah), minutosDia: n(r.mpd) }) });
     }
     for (const r of await read('INCIDENCIALIMITE', [['emp', ['CODIGO']], ['inc', ['INCIDENCIA']], ['f', ['FECHAINICIO', 'FECHAINCIO']], ['t', ['FECHAFIN']],
       ['lim', ['LIMITE']], ['val', ['VALOR']], ['pd', ['PERIODOENDIAS']]])) {

@@ -991,7 +991,7 @@ export function evalosRoutes(r: Router) {
     if (!driver.listEmployeePeriods) return [];
     const { vacations } = await driver.listEmployeePeriods([employee], date);
     return vacations.filter((v) => v.employee === employee && v.from <= date && (!v.to || v.to >= date))
-      .map((v) => ({ type: v.type, unit: v.unit || 'D', from: v.from, to: v.to, days: v.days, hours: v.hours, assignedDays: v.assignedDays, assignedHours: v.assignedHours }));
+      .map((v) => ({ type: v.type, unit: v.unit || 'D', from: v.from, to: v.to, days: v.days, hours: v.hours, minutesPerDay: v.minutesPerDay ?? null, assignedDays: v.assignedDays, assignedHours: v.assignedHours }));
   };
   r.get('/api/evalos/correcciones/periodosvacaciones', async (req) => {
     const { c } = await requireEvalos(req);

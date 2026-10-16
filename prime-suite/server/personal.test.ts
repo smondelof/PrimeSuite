@@ -779,7 +779,7 @@ test('SQL Server: asignar y quitar el convenio a varios empleados (EM_CONV)', as
 
 test('SQL Server: al guardar un convenio se escriben sus periodos, límites y pluses', async () => {
   const c4 = (n: string) => [col(n, 'nvarchar', 10, false)];
-  TABLES.PS_CONVENIOS = [...c4('CV_CODI'), col('CV_IFDI', 'tinyint', null)]; TABLES.PS_CONVENIOS_VACACIONES = [...c4('CA_CONV'), col('CA_LINE', 'smallint', null, false), col('CA_FDIA', 'tinyint', null), col('CA_UNID', 'char', 1)];
+  TABLES.PS_CONVENIOS = [...c4('CV_CODI'), col('CV_IFDI', 'tinyint', null)]; TABLES.PS_CONVENIOS_VACACIONES = [...c4('CA_CONV'), col('CA_LINE', 'smallint', null, false), col('CA_FDIA', 'tinyint', null), col('CA_UNID', 'char', 1), col('CA_MDIA', 'int', null)];
   TABLES.PS_CONVENIOS_LIMITES = c4('CL_CONV'); TABLES.PS_CONVENIOS_PLUSES = c4('CP_CONV');
   const { drv, calls } = fakeSql((text) => (text.includes('COUNT(*)') ? { rows: [{ n: 0 }] } : { rows: [] }));
   await drv.saveConvenio({
@@ -814,14 +814,21 @@ test('SQL Server: periodos de VACACIONES (alta con valores fijos; actualización
   await drv.upsertVacationPeriods([{ ...row, days: 20 }], stamp);
   const up = calls.find((c) => c.text.startsWith('UPDATE [VACACIONES]'))!;
   assert.ok(up && !/DIASASIGNADOS/.test(up.text) && /\[TOTALDIAS\] = @p\d/.test(up.text));
-  // Periodo en horas: PERIODOENDIAS 0, TOTALDIAS 0 y TOTALHORAS con las horas.
+  // Periodo en horas, como lo graba Evalos: PERIODOENDIAS 0, TOTALDIAS = minutos (16:30 h = 990), MINUTOSDIA = minutos de un día y TOTALHORAS 0.
   exists = 0; calls.length = 0;
-  await drv.upsertVacationPeriods([{ ...row, type: 'AP', unit: 'H', days: 0, hours: 16.5 }], stamp);
+  await drv.upsertVacationPeriods([{ ...row, type: 'AP', unit: 'H', days: 0, hours: 16.5, minutesPerDay: 450 }], stamp);
   const ih = calls.find((c) => c.text.startsWith('INSERT INTO [VACACIONES]'))!;
   const mh = ih.text.match(/VALUES \(([^)]*)\)/)![1].split(', ').map((x) => x.slice(1));
   const ch = ih.text.match(/\(([^)]*)\) VALUES/)![1].split(', ').map((x) => x.replace(/[[\]]/g, ''));
   const vh = (c: string) => ih.params[mh[ch.indexOf(c)]];
-  assert.deepEqual([vh('TOTALDIAS'), vh('PERIODOENDIAS'), vh('TOTALHORAS'), vh('HORASASIGNADAS')], [0, 0, 16.5, 0]);
+  assert.deepEqual([vh('TOTALDIAS'), vh('PERIODOENDIAS'), vh('MINUTOSDIA'), vh('TOTALHORAS'), vh('HORASASIGNADAS')], [990, 0, 450, 0, 0]);
+  // Al actualizarlo se corrigen también MINUTOSDIA y TOTALHORAS (filas grabadas con la versión anterior).
+  exists = 1; calls.length = 0;
+  await drv.upsertVacationPeriods([{ ...row, type: 'AP', unit: 'H', days: 0, hours: 150, minutesPerDay: 480 }], stamp);
+  const uh = calls.find((c) => c.text.startsWith('UPDATE [VACACIONES]'))!;
+  const setv = (c: string) => uh.params[uh.text.match(new RegExp(`\\[${c}\\] = @(p\\d+)`))![1]];
+  assert.deepEqual([setv('TOTALDIAS'), setv('MINUTOSDIA'), setv('TOTALHORAS'), setv('PERIODOENDIAS')], [9000, 480, 0, 0]);
+  assert.ok(!/DIASASIGNADOS|HORASASIGNADAS/.test(uh.text));
   delete TABLES.VACACIONES;
 });
 
@@ -840,7 +847,7 @@ test('SQL Server: periodos de INCIDENCIALIMITE (límite en minutos y PERIODOENDI
 
 test('SQL Server: los límites guardados en días se leen en horas (8 h por día) y se guardan en minutos', async () => {
   const c4 = (n: string) => [col(n, 'nvarchar', 10, false)];
-  TABLES.PS_CONVENIOS = [...c4('CV_CODI'), col('CV_IFDI', 'tinyint', null)]; TABLES.PS_CONVENIOS_VACACIONES = [...c4('CA_CONV'), col('CA_LINE', 'smallint', null, false), col('CA_FDIA', 'tinyint', null), col('CA_UNID', 'char', 1)];
+  TABLES.PS_CONVENIOS = [...c4('CV_CODI'), col('CV_IFDI', 'tinyint', null)]; TABLES.PS_CONVENIOS_VACACIONES = [...c4('CA_CONV'), col('CA_LINE', 'smallint', null, false), col('CA_FDIA', 'tinyint', null), col('CA_UNID', 'char', 1), col('CA_MDIA', 'int', null)];
   TABLES.PS_CONVENIOS_LIMITES = c4('CL_CONV'); TABLES.PS_CONVENIOS_PLUSES = c4('CP_CONV');
   const { drv, calls } = fakeSql((text) => {
     if (text.includes('FROM [PS_CONVENIOS] ORDER BY')) return { rows: [{ code: 'METAL', name: 'METAL', id: 1, im: 1 }] };

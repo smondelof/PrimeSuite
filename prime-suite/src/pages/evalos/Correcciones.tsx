@@ -602,15 +602,20 @@ function VacacionesDia({ marcaje, onSaved }: { marcaje: EvalosRestMarcaje; onSav
   const [hours, setHours] = useState('');
   const [busy, setBusy] = useState(false);
   // Periodos del empleado que incluyen el día: si el del tipo elegido es en horas, se piden horas (AsignarHorasVacaciones).
-  const [periods, setPeriods] = useState<{ type: string; unit: 'D' | 'H' }[]>([]);
+  const [periods, setPeriods] = useState<{ type: string; unit: 'D' | 'H'; minutesPerDay?: number | null }[]>([]);
   const toast = useToast();
   useEffect(() => { loadTiposVacaciones().then(setList, (e) => setErr(e.message)); }, []);
   useEffect(() => {
-    api.get<{ items: { type: string; unit: 'D' | 'H' }[] }>(`/api/evalos/correcciones/periodosvacaciones?employee=${encodeURIComponent(marcaje.employee)}&date=${marcaje.date}`)
+    api.get<{ items: { type: string; unit: 'D' | 'H'; minutesPerDay?: number | null }[] }>(`/api/evalos/correcciones/periodosvacaciones?employee=${encodeURIComponent(marcaje.employee)}&date=${marcaje.date}`)
       .then((r) => setPeriods(r.items), () => setPeriods([]));
   }, [marcaje.employee, marcaje.date]);
-  const unitOf = (code: string) => periods.find((p) => p.type.toUpperCase() === code.toUpperCase())?.unit;
+  const periodOf = (code: string) => periods.find((p) => p.type.toUpperCase() === code.toUpperCase());
+  const unitOf = (code: string) => periodOf(code)?.unit;
   const inHours = !!type && unitOf(type) === 'H';
+  // Periodo en horas: se proponen las horas de un día de vacaciones del periodo (MINUTOSDIA); se pueden cambiar.
+  const dayMin = (inHours && periodOf(type)?.minutesPerDay) || 0;
+  const dayHours = dayMin ? `${String(Math.floor(dayMin / 60)).padStart(2, '0')}:${String(dayMin % 60).padStart(2, '0')}` : '';
+  useEffect(() => { setHours(dayHours); }, [type, dayHours]);
   const nameOf = (code: string) => list?.find((x) => x.code === code)?.name || code;
   const changed = type !== current;
   const hoursOk = !inHours || /^\d{1,2}:[0-5]\d$/.test(hours.trim()) && hours.trim() !== '0:00' && hours.trim() !== '00:00';
@@ -650,7 +655,11 @@ function VacacionesDia({ marcaje, onSaved }: { marcaje: EvalosRestMarcaje; onSav
           {busy ? 'Guardando…' : !changed ? (current ? 'Vacaciones asignadas' : 'Asignar vacaciones') : type ? (inHours ? 'Asignar horas' : current ? 'Cambiar vacaciones' : 'Asignar vacaciones') : 'Quitar vacaciones'}
         </button>
       </div>
-      {inHours && changed && <span className="xs muted">Periodo en horas: se asignan las horas indicadas (HH:MM) en lugar del día completo.</span>}
+      {inHours && changed && (
+        <span className="xs muted">
+          Periodo en horas: se asignan las horas indicadas (HH:MM).{dayHours ? ` Un día de vacaciones de este periodo son ${dayHours} h.` : ''}
+        </span>
+      )}
     </div>
   );
 }

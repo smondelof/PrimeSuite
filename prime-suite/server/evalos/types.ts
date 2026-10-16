@@ -133,7 +133,8 @@ export interface ConvenioLimit { incidence: string; unit: 'H'; value: number; pl
  * unit D (o sin unit) = periodo en días (PERIODOENDIAS 1): days = TOTALDIAS y hours = TOTALHORAS (días × horas por día).
  * unit H = periodo en horas (PERIODOENDIAS 0): days = 0 y hours = TOTALHORAS (horas con decimales).
  */
-export interface VacationPeriodRow { employee: string; type: string; from: string; to: string; unit?: 'D' | 'H'; days: number; hours: number; prevFrom?: string }
+/** Periodo de VACACIONES de una persona: en días (days) o en horas (unit H: hours con decimales y minutesPerDay = minutos de un día de vacaciones). */
+export interface VacationPeriodRow { employee: string; type: string; from: string; to: string; unit?: 'D' | 'H'; days: number; hours: number; minutesPerDay?: number; prevFrom?: string }
 /** Periodo de INCIDENCIALIMITE de una persona: límite en días (unit D) o minutos (unit H). */
 export interface IncidenceLimitRow { employee: string; incidence: string; from: string; to: string; unit: 'D' | 'H'; value: number; prevFrom?: string }
 /** Clave de un periodo grabado (persona + tipo de vacaciones o incidencia + FECHAINICIO). */
@@ -160,7 +161,8 @@ export interface PeriodEnd { endDay: number; endMonth: number; endNextYear: bool
  * Periodo de vacaciones de un convenio. unit D (o sin unit) = en días: days (admite medios días) y pluses en días.
  * unit H = en horas: minutes (8:30 h = 510), days = 0 y pluses en minutos.
  */
-export interface ConvenioVacation extends Partial<PeriodEnd> { type: string; day: number; month: number; unit?: 'D' | 'H'; days: number; minutes?: number; pluses?: ConvenioPlus[] }
+/** Periodo de vacaciones del convenio. En horas: minutes (total) y minutesPerDay (lo que vale un día de vacaciones, MINUTOSDIA). */
+export interface ConvenioVacation extends Partial<PeriodEnd> { type: string; day: number; month: number; unit?: 'D' | 'H'; days: number; minutes?: number; minutesPerDay?: number; pluses?: ConvenioPlus[] }
 export interface Convenio {
   code: string;
   name: string;
