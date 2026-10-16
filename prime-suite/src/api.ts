@@ -117,6 +117,8 @@ export interface SupersetServer { id: string; name: string; baseUrl: string; use
 export interface EvalosScreenInfo { key: string; title: string; description: string; glyph: string; widgetSize: 's' | 'm' | 'l' }
 export interface EvalosMe {
   role: ModuleRole; canEdit: boolean; canDelete: boolean; canConfigure: boolean;
+  /** Administrador (del portal o rol admin del módulo): ve Seguridad y perfiles y el log de llamadas a Evalos. */
+  isAdmin?: boolean;
   configured: boolean; engine: 'mssql' | 'demo' | null; connHint: string | null; screens: EvalosScreenInfo[];
 }
 export interface EvalosMapping {
@@ -289,6 +291,14 @@ export interface EvalosReportPreview { rows: number; anomalies: number; columns:
 export interface EvalosCalendarPreview { rows: number; days: number; columns: string[]; sample: string; dateFormat: string }
 export interface EvalosRestMarcajesResponse { marcajes: EvalosRestMarcaje[]; warnings: string[]; ms: number; report: string; reportPreview: EvalosReportPreview | null; calendarPreview: EvalosCalendarPreview | null; hiddenUnknown?: number; from: string; to: string }
 export interface EvalosIncidencia { code: string; name: string }
+
+/** Llamada a Evalos 8 en el log de Atajos de Evalos (SOAP, EvalosRest o escritura de periodos por SQL). */
+export interface EvalosCallEvent {
+  id: string; at: string; kind: 'soap' | 'rest' | 'sql'; op: string; ok: boolean;
+  status?: number; ms?: number; url?: string; params?: Record<string, unknown>;
+  request?: string; response?: string; result?: string; error?: string;
+  companyId?: string | null; userEmail?: string | null;
+}
 
 /** Paso del log de inicio de sesión (integraciones con «Ver log de inicio de sesión»). */
 export interface SsoTraceEvent {

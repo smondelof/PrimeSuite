@@ -11,6 +11,7 @@ import { LEGACY_PERFILES_TABLE, WF_PERFILES_TABLE, WF_ROLE_COLUMN, WF_VALIDA_TAB
 import { defaultEnd } from './convperiods.ts';
 import { CONVENIOS_TABLE, CONVENIO_CODE_MAX, LIMITES_TABLE, LIMIT_HOURS_PER_DAY, PLUSES_TABLE, VACACIONES_TABLE, VACATION_TYPE_DEFAULTS, conveniosSql, detectColorFormat, encodeColor, vacationTypeDefault } from './convenios.ts';
 import { HISTORY, HISTORY_KINDS, ORG_KINDS, checkEndChange, checkReadmit, cardDescription, dmy, madridNow, nextCode, prevDay, toEntry, ymdOf, type HistoryDef } from './history.ts';
+import { logEvalosCall } from './calllog.ts';
 
 /** Pantalla de Atajos a la que probablemente pertenece una tabla, por su nombre (orientativo). */
 const TOPICS: [string, RegExp][] = [
@@ -1340,33 +1341,50 @@ export class SqlServerDriver implements EvalosDriver {
     const { t, cols, col } = await this.periodTable(table);
     const need = (names: string[]) => { const c = col(...names); if (!c) throw new HttpError(409, `La tabla ${table} no tiene la columna ${names[0]}.`); return c; };
     let created = 0, updated = 0;
-    await this.inTx(async (q) => {
-      for (const r of rows) {
-        const params: Record<string, unknown> = {};
-        let n = 0;
-        const p = (v: unknown) => { const k = `p${n++}`; params[k] = v; return `@${k}`; };
-        const where = r.key.map(([names, kind, v]) => { const c = need(names); return `${ident(c.name, 'columna')} = ${p(this.periodValue(c, kind, v))}`; }).join(' AND ');
-        const { rows: found } = await q(`SELECT COUNT(*) AS n FROM ${tableRef(t)} WITH (UPDLOCK, HOLDLOCK) WHERE ${where}`, params);
-        if (Number(found[0]?.n) > 0) {
-          const sets = r.update.map(([names, kind, v]) => { const c = col(...names); return c ? `${ident(c.name, 'columna')} = ${p(this.periodValue(c, kind, v))}` : ''; }).filter(Boolean);
-          if (sets.length) await q(`UPDATE ${tableRef(t)} SET ${sets.join(', ')} WHERE ${where}`, params);
-          updated++;
-        } else {
-          const names: string[] = [], vals: string[] = [];
-          for (const [ns, kind, v] of [...r.key, ...r.insert] as [string[], 'date' | 'time' | 'num' | 'text', string | number | null][]) {
-            const c = col(...ns);
-            if (!c || names.includes(c.name)) continue;
-            names.push(c.name); vals.push(p(this.periodValue(c, kind, v)));
+    // Log de llamadas: lo que se escribe en cada fila (columna → valor y tipo de la columna).
+    const logged: { op: string; sql: string; values: Record<string, unknown> }[] = [];
+    const show = (c: ColumnInfo, v: unknown) => (v instanceof Date ? `${v.toISOString().slice(0, 10)} (${c.type})` : `${v === '' ? "''" : String(v)} (${c.type})`);
+    const started = Date.now();
+    try {
+      await this.inTx(async (q) => {
+        for (const r of rows) {
+          const params: Record<string, unknown> = {};
+          const values: Record<string, unknown> = {};
+          let n = 0;
+          const p = (v: unknown, c?: ColumnInfo, as?: string) => { const k = `p${n++}`; params[k] = v; if (c) values[as || c.name] = show(c, v); return `@${k}`; };
+          const where = r.key.map(([names, kind, v]) => { const c = need(names); return `${ident(c.name, 'columna')} = ${p(this.periodValue(c, kind, v), c, `${c.name} (clave)`)}`; }).join(' AND ');
+          const { rows: found } = await q(`SELECT COUNT(*) AS n FROM ${tableRef(t)} WITH (UPDLOCK, HOLDLOCK) WHERE ${where}`, params);
+          if (Number(found[0]?.n) > 0) {
+            const sets = r.update.map(([names, kind, v]) => { const c = col(...names); return c ? `${ident(c.name, 'columna')} = ${p(this.periodValue(c, kind, v), c)}` : ''; }).filter(Boolean);
+            const sql = `UPDATE ${tableRef(t)} SET ${sets.join(', ')} WHERE ${where}`;
+            if (sets.length) await q(sql, params);
+            logged.push({ op: `UPDATE ${table}`, sql, values });
+            updated++;
+          } else {
+            const names: string[] = [], vals: string[] = [];
+            for (const [ns, kind, v] of [...r.key, ...r.insert] as [string[], 'date' | 'time' | 'num' | 'text', string | number | null][]) {
+              const c = col(...ns);
+              if (!c || names.includes(c.name)) continue;
+              names.push(c.name); vals.push(p(this.periodValue(c, kind, v), c));
+            }
+            for (const c of cols) {
+              if (names.includes(c.name) || c.nullable || c.hasDefault || c.identity || c.computed || BINARY_TYPES.includes(c.type)) continue;
+              names.push(c.name); vals.push(p(CHAR_TYPES.includes(c.type) ? '' : NUM_TYPES.includes(c.type) ? 0 : DATE_TYPES.includes(c.type) ? new Date() : '', c, `${c.name} (obligatoria, relleno)`));
+            }
+            const sql = `INSERT INTO ${tableRef(t)} (${names.map((x) => ident(x, 'columna')).join(', ')}) VALUES (${vals.join(', ')})`;
+            await q(sql, params);
+            logged.push({ op: `INSERT ${table}`, sql, values });
+            created++;
           }
-          for (const c of cols) {
-            if (names.includes(c.name) || c.nullable || c.hasDefault || c.identity || c.computed || BINARY_TYPES.includes(c.type)) continue;
-            names.push(c.name); vals.push(p(CHAR_TYPES.includes(c.type) ? '' : NUM_TYPES.includes(c.type) ? 0 : DATE_TYPES.includes(c.type) ? new Date() : ''));
-          }
-          await q(`INSERT INTO ${tableRef(t)} (${names.map((x) => ident(x, 'columna')).join(', ')}) VALUES (${vals.join(', ')})`, params);
-          created++;
         }
-      }
-    });
+      });
+    } catch (e: any) {
+      for (const l of logged) void logEvalosCall({ kind: 'sql', op: l.op, ok: false, params: l.values, request: l.sql, error: 'Deshecho: la transacción falló.' });
+      void logEvalosCall({ kind: 'sql', op: `Grabar ${table}`, ok: false, ms: Date.now() - started, error: e?.message || String(e) });
+      throw e;
+    }
+    const ms = Date.now() - started;
+    for (const l of logged) void logEvalosCall({ kind: 'sql', op: l.op, ok: true, ms, params: l.values, request: l.sql });
     return { created, updated };
   }
 
@@ -1404,8 +1422,11 @@ export class SqlServerDriver implements EvalosDriver {
     let n = 0;
     await this.inTx(async (q) => {
       for (const k of keys) {
-        const { affected } = await q(`DELETE FROM ${tableRef(t)} WHERE ${ident(code.name, 'columna')} = @e AND ${ident(kind.name, 'columna')} = @k AND ${ident(from.name, 'columna')} = @f`,
-          { e: k.employee, k: k.code, f: this.periodValue(from, 'date', k.from.replace(/-/g, '')) });
+        const sql = `DELETE FROM ${tableRef(t)} WHERE ${ident(code.name, 'columna')} = @e AND ${ident(kind.name, 'columna')} = @k AND ${ident(from.name, 'columna')} = @f`;
+        const f = this.periodValue(from, 'date', k.from.replace(/-/g, ''));
+        const { affected } = await q(sql, { e: k.employee, k: k.code, f });
+        void logEvalosCall({ kind: 'sql', op: `DELETE ${name}`, ok: true, request: sql, result: `${affected} fila(s) borrada(s)`,
+          params: { [code.name]: k.employee, [kind.name]: k.code, [from.name]: f instanceof Date ? f.toISOString().slice(0, 10) : f } });
         n += affected;
       }
     });

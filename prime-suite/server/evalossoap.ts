@@ -6,6 +6,7 @@ import { HttpError } from './http.ts';
 import { Modules } from './db.ts';
 import { safeFetch } from './netguard.ts';
 import { EVALOS_REST_CLIENT_ID } from './evalosrest.ts';
+import { logEvalosCall } from './evalos/calllog.ts';
 
 const DEFAULT_NS = 'http://SuiteControls.Net/';
 
@@ -96,25 +97,30 @@ export async function callEvalosSoap(op: string, values: SoapValues, portalOrigi
   // Empresa de conexión: si no se indica, la de la URL (…/suiteclient133/… → 133).
   const v: SoapValues = { ...values, company: values.company || companyFromSoapUrl(url) };
   const params = def.params.map((p) => [p, valueFor(p, v)] as [string, string]);
+  const envelope = soapEnvelope(desc.namespace, def.name, params);
   const started = Date.now();
+  const entry = { kind: 'soap' as const, op: def.name, url, params: Object.fromEntries(params), request: envelope };
   let res: Response;
   try {
     ({ res } = await safeFetch(url, {
       method: 'POST',
       headers: { 'content-type': 'text/xml; charset=utf-8', SOAPAction: `"${desc.namespace}${def.name}"` },
-      body: soapEnvelope(desc.namespace, def.name, params),
+      body: envelope,
       portalOrigin,
       timeoutMs: 30000
     }));
   } catch (e: any) {
-    if (e instanceof HttpError) throw e;
-    throw new HttpError(502, `No se pudo conectar con los servicios SOAP de Evalos (${e?.name === 'AbortError' ? 'sin respuesta en 30 s' : e?.cause?.code || e?.message}).`);
+    const err = e instanceof HttpError ? e : new HttpError(502, `No se pudo conectar con los servicios SOAP de Evalos (${e?.name === 'AbortError' ? 'sin respuesta en 30 s' : e?.cause?.code || e?.message}).`);
+    void logEvalosCall({ ...entry, ok: false, ms: Date.now() - started, error: err.message });
+    throw err;
   }
   const text = await res.text();
   const r = soapResult(text, def.name);
-  if (r.fault) throw new HttpError(502, `Evalos (SOAP ${def.name}): ${r.fault.slice(0, 300)}`);
-  if (!res.ok) throw new HttpError(502, `El servicio SOAP de Evalos respondió ${res.status} en ${def.name}.`);
-  return { result: r.result, ms: Date.now() - started, params: def.params };
+  const ms = Date.now() - started;
+  const fail = r.fault ? `Evalos (SOAP ${def.name}): ${r.fault.slice(0, 300)}` : !res.ok ? `El servicio SOAP de Evalos respondió ${res.status} en ${def.name}.` : '';
+  void logEvalosCall({ ...entry, ok: !fail && soapOk(r.result), status: res.status, ms, response: text, result: r.fault ? undefined : r.result || '(vacío)', error: fail || undefined });
+  if (fail) throw new HttpError(502, fail);
+  return { result: r.result, ms, params: def.params };
 }
 
 /** Resultado correcto de una escritura: «Ok», «true», «1» o vacío. Otro texto es el mensaje de error de Evalos. */

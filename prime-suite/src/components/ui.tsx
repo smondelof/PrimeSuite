@@ -197,7 +197,7 @@ export function Modal({ title, onClose, children, wide, width }: { title: string
   );
 }
 
-export function Drawer({ title, onClose, children }: { title: ReactNode; onClose: () => void; children: ReactNode }) {
+export function Drawer({ title, onClose, children, width }: { title: ReactNode; onClose: () => void; children: ReactNode; width?: number }) {
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', k);
@@ -205,7 +205,7 @@ export function Drawer({ title, onClose, children }: { title: ReactNode; onClose
   }, [onClose]);
   return createPortal(
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <aside className="drawer" role="dialog" aria-modal="true">
+      <aside className="drawer" role="dialog" aria-modal="true" style={width ? { width: `min(${width}px, 100%)` } : undefined}>
         <div className="row">
           <div className="grow">{title}</div>
           <button className="icon-btn" onClick={onClose} aria-label="Cerrar"><Icon.x /></button>

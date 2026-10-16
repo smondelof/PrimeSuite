@@ -610,6 +610,13 @@ body {
 .sso-kv .sso-kv { margin-top: 2px; }
 .sso-identity { gap: 4px; padding: 14px 16px; border-left: 3px solid var(--info-ink); }
 
+/* Log de llamadas a Evalos */
+.evcall-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.evcall-head .chev { display: inline-flex; color: var(--muted); transition: transform .15s; }
+.evcall-head .chev.open { transform: rotate(180deg); }
+.evcall-head b { word-break: break-all; }
+pre.code.evcall-pre { max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-all; padding: 12px; font-size: 12px; }
+
 
 /* ---- Atajos de Evalos · Teletrabajo ---- */
 .tw-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
