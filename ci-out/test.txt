@@ -1,0 +1,1155 @@
+
+> prime-suite@2.0.0 test
+> node --import tsx --test server/*.test.ts
+
+TAP version 13
+# Subtest: Evalos8 trae precargadas las URLs de EvalosRest y de los servicios SOAP, sin credenciales; las demás integraciones no
+ok 1 - Evalos8 trae precargadas las URLs de EvalosRest y de los servicios SOAP, sin credenciales; las demás integraciones no
+  ---
+  duration_ms: 30.172135
+  type: 'test'
+  ...
+# Subtest: la precarga es única: si se borra la sección no vuelve a aparecer
+ok 2 - la precarga es única: si se borra la sección no vuelve a aparecer
+  ---
+  duration_ms: 18.834929
+  type: 'test'
+  ...
+# Subtest: guardar: el secreto se cifra, nunca se devuelve y se conserva si no se envía
+ok 3 - guardar: el secreto se cifra, nunca se devuelve y se conserva si no se envía
+  ---
+  duration_ms: 28.470253
+  type: 'test'
+  ...
+# Subtest: probar conexión con el secreto guardado: pide el token con client_credentials y no lo devuelve
+ok 4 - probar conexión con el secreto guardado: pide el token con client_credentials y no lo devuelve
+  ---
+  duration_ms: 25.09443
+  type: 'test'
+  ...
+# Subtest: probar conexión con datos del formulario sin guardar: secreto incorrecto → error claro
+ok 5 - probar conexión con datos del formulario sin guardar: secreto incorrecto → error claro
+  ---
+  duration_ms: 4.692313
+  type: 'test'
+  ...
+# Subtest: URL token inalcanzable → error de conexión, no excepción
+ok 6 - URL token inalcanzable → error de conexión, no excepción
+  ---
+  duration_ms: 3.014788
+  type: 'test'
+  ...
+# Subtest: borrar el secreto, validación de URLs y permisos
+ok 7 - borrar el secreto, validación de URLs y permisos
+  ---
+  duration_ms: 18.894407
+  type: 'test'
+  ...
+# Subtest: apunta la llamada con la empresa y el usuario de la petición
+ok 8 - apunta la llamada con la empresa y el usuario de la petición
+  ---
+  duration_ms: 225.92119
+  type: 'test'
+  ...
+# Subtest: filtra por empresa y tipo, más recientes primero
+ok 9 - filtra por empresa y tipo, más recientes primero
+  ---
+  duration_ms: 212.835322
+  type: 'test'
+  ...
+# Subtest: no guarda secretos y recorta las respuestas grandes de las consultas
+ok 10 - no guarda secretos y recorta las respuestas grandes de las consultas
+  ---
+  duration_ms: 206.27535
+  type: 'test'
+  ...
+# Subtest: agrupa muchas llamadas seguidas sin perder ninguna
+ok 11 - agrupa muchas llamadas seguidas sin perder ninguna
+  ---
+  duration_ms: 204.465498
+  type: 'test'
+  ...
+# Subtest: normaliza el convenio: código en mayúsculas, nombre limpio y límites ordenados
+ok 12 - normaliza el convenio: código en mayúsculas, nombre limpio y límites ordenados
+  ---
+  duration_ms: 13.350088
+  type: 'test'
+  ...
+# Subtest: rechaza datos no válidos
+ok 13 - rechaza datos no válidos
+  ---
+  duration_ms: 1.436383
+  type: 'test'
+  ...
+# Subtest: sin lista de incidencias no se comprueba que existan
+ok 14 - sin lista de incidencias no se comprueba que existan
+  ---
+  duration_ms: 0.234892
+  type: 'test'
+  ...
+# Subtest: día/mes de inicio: febrero solo hasta el 28
+ok 15 - día/mes de inicio: febrero solo hasta el 28
+  ---
+  duration_ms: 0.161772
+  type: 'test'
+  ...
+# Subtest: periodo de un año que contiene la fecha de referencia
+ok 16 - periodo de un año que contiene la fecha de referencia
+  ---
+  duration_ms: 0.445578
+  type: 'test'
+  ...
+# Subtest: el script crea las tres tablas solo si no existen, en el esquema indicado
+ok 17 - el script crea las tres tablas solo si no existen, en el esquema indicado
+  ---
+  duration_ms: 0.629329
+  type: 'test'
+  ...
+# Subtest: color del tipo de vacaciones en el formato de la tabla, y se lee igual
+ok 18 - color del tipo de vacaciones en el formato de la tabla, y se lee igual
+  ---
+  duration_ms: 0.629773
+  type: 'test'
+  ...
+# Subtest: valores de un tipo de vacaciones nuevo según el tipo de columna
+ok 19 - valores de un tipo de vacaciones nuevo según el tipo de columna
+  ---
+  duration_ms: 0.182213
+  type: 'test'
+  ...
+# Subtest: pluses por antigüedad en periodos de vacaciones y límites de incidencia
+ok 20 - pluses por antigüedad en periodos de vacaciones y límites de incidencia
+  ---
+  duration_ms: 0.644636
+  type: 'test'
+  ...
+# Subtest: el script crea la tabla de pluses
+ok 21 - el script crea la tabla de pluses
+  ---
+  duration_ms: 0.470606
+  type: 'test'
+  ...
+# Subtest: las incidencias van siempre en horas, aunque llegue otra unidad
+ok 22 - las incidencias van siempre en horas, aunque llegue otra unidad
+  ---
+  duration_ms: 0.176905
+  type: 'test'
+  ...
+# Subtest: fin del periodo: mismo año posterior al inicio, o del año siguiente (también más de un año)
+ok 23 - fin del periodo: mismo año posterior al inicio, o del año siguiente (también más de un año)
+  ---
+  duration_ms: 0.312608
+  type: 'test'
+  ...
+# Subtest: periodos de vacaciones en horas: valor y pluses en minutos
+ok 24 - periodos de vacaciones en horas: valor y pluses en minutos
+  ---
+  duration_ms: 0.547651
+  type: 'test'
+  ...
+# Subtest: el script añade las columnas de periodos en horas y deja CA_DIAS opcional
+ok 25 - el script añade las columnas de periodos en horas y deja CA_DIAS opcional
+  ---
+  duration_ms: 0.275924
+  type: 'test'
+  ...
+# Subtest: periodo de un año: la fecha fin es el día anterior
+ok 26 - periodo de un año: la fecha fin es el día anterior
+  ---
+  duration_ms: 1.787168
+  type: 'test'
+  ...
+# Subtest: antigüedad en años cumplidos y plus del tramo más alto alcanzado
+ok 27 - antigüedad en años cumplidos y plus del tramo más alto alcanzado
+  ---
+  duration_ms: 0.266008
+  type: 'test'
+  ...
+# Subtest: ejemplo 1: alta a mitad de periodo → empieza en el alta y se prorratea (al medio día)
+ok 28 - ejemplo 1: alta a mitad de periodo → empieza en el alta y se prorratea (al medio día)
+  ---
+  duration_ms: 0.329264
+  type: 'test'
+  ...
+# Subtest: ejemplo 2: 20 días + 2 de plus a los 5 años, alta en 2020 → 22 días
+ok 29 - ejemplo 2: 20 días + 2 de plus a los 5 años, alta en 2020 → 22 días
+  ---
+  duration_ms: 0.15993
+  type: 'test'
+  ...
+# Subtest: límites en horas: prorrateo al minuto; sin alta en el periodo → null
+ok 30 - límites en horas: prorrateo al minuto; sin alta en el periodo → null
+  ---
+  duration_ms: 0.263445
+  type: 'test'
+  ...
+# Subtest: periodo siguiente
+ok 31 - periodo siguiente
+  ---
+  duration_ms: 0.310866
+  type: 'test'
+  ...
+# Subtest: filas de VACACIONES e INCIDENCIALIMITE de una persona (TOTALHORAS = días × 8)
+ok 32 - filas de VACACIONES e INCIDENCIALIMITE de una persona (TOTALHORAS = días × 8)
+  ---
+  duration_ms: 0.543474
+  type: 'test'
+  ...
+# Subtest: avisos de exceso solo en periodos vigentes
+ok 33 - avisos de exceso solo en periodos vigentes
+  ---
+  duration_ms: 13.945901
+  type: 'test'
+  ...
+# Subtest: sincronizar: periodo en curso, el siguiente solo si existe, sin bajas, y avisos
+ok 34 - sincronizar: periodo en curso, el siguiente solo si existe, sin bajas, y avisos
+  ---
+  duration_ms: 2.920597
+  type: 'test'
+  ...
+# Subtest: fecha de alta corregida a una anterior: se corrige FECHAINICIO y se recalcula sin tocar lo disfrutado
+ok 35 - fecha de alta corregida a una anterior: se corrige FECHAINICIO y se recalcula sin tocar lo disfrutado
+  ---
+  duration_ms: 1.1612
+  type: 'test'
+  ...
+# Subtest: fecha de alta corregida a una posterior: se reduce el prorrateo
+ok 36 - fecha de alta corregida a una posterior: se reduce el prorrateo
+  ---
+  duration_ms: 0.639439
+  type: 'test'
+  ...
+# Subtest: fecha de alta corregida al año siguiente: el periodo que ya no corresponde se borra si no tiene nada disfrutado
+ok 37 - fecha de alta corregida al año siguiente: el periodo que ya no corresponde se borra si no tiene nada disfrutado
+  ---
+  duration_ms: 0.804436
+  type: 'test'
+  ...
+# Subtest: periodos con fin propio: más de un año (se solapan) y de menos de un año (con hueco)
+ok 38 - periodos con fin propio: más de un año (se solapan) y de menos de un año (con hueco)
+  ---
+  duration_ms: 0.237045
+  type: 'test'
+  ...
+# Subtest: periodo de vacaciones en horas: TOTALHORAS en horas, plus en minutos y prorrateo al minuto
+ok 39 - periodo de vacaciones en horas: TOTALHORAS en horas, plus en minutos y prorrateo al minuto
+  ---
+  duration_ms: 0.258017
+  type: 'test'
+  ...
+# Subtest: columnas de VACACIONES como las graba Evalos: en horas, total en minutos en TOTALDIAS y MINUTOSDIA
+ok 40 - columnas de VACACIONES como las graba Evalos: en horas, total en minutos en TOTALDIAS y MINUTOSDIA
+  ---
+  duration_ms: 0.251807
+  type: 'test'
+  ...
+# Subtest: avisos de exceso en periodos de vacaciones en horas
+ok 41 - avisos de exceso en periodos de vacaciones en horas
+  ---
+  duration_ms: 0.153049
+  type: 'test'
+  ...
+# Subtest: por defecto el menú muestra todas las opciones
+ok 42 - por defecto el menú muestra todas las opciones
+  ---
+  duration_ms: 42.942053
+  type: 'test'
+  ...
+# Subtest: ocultar opciones: no salen en el menú; las claves desconocidas se ignoran
+ok 43 - ocultar opciones: no salen en el menú; las claves desconocidas se ignoran
+  ---
+  duration_ms: 11.652126
+  type: 'test'
+  ...
+# Subtest: guardar sin el campo conserva las opciones ocultas; con lista vacía se vuelven a mostrar todas
+ok 44 - guardar sin el campo conserva las opciones ocultas; con lista vacía se vuelven a mostrar todas
+  ---
+  duration_ms: 18.942244
+  type: 'test'
+  ...
+# Subtest: sin API REST configurada: error 409 que dice dónde configurarla
+ok 45 - sin API REST configurada: error 409 que dice dónde configurarla
+  ---
+  duration_ms: 30.5047
+  type: 'test'
+  ...
+# Subtest: Marcajes: pide el token con client credentials y une marcajes y anomalías PS_ANOMA por empleado y día
+ok 46 - Marcajes: pide el token con client credentials y une marcajes y anomalías PS_ANOMA por empleado y día
+  ---
+  duration_ms: 63.207526
+  type: 'test'
+  ...
+# Subtest: el token se reutiliza entre llamadas
+ok 47 - el token se reutiliza entre llamadas
+  ---
+  duration_ms: 35.532171
+  type: 'test'
+  ...
+# Subtest: ante un 401 pide un token nuevo y reintenta una vez
+ok 48 - ante un 401 pide un token nuevo y reintenta una vez
+  ---
+  duration_ms: 23.234187
+  type: 'test'
+  ...
+# Subtest: Marcajes de un empleado: filtra Booking por código y el listado con EM_CODI
+ok 49 - Marcajes de un empleado: filtra Booking por código y el listado con EM_CODI
+  ---
+  duration_ms: 9.493461
+  type: 'test'
+  ...
+# Subtest: Marcajes: periodo y empleado se validan
+ok 50 - Marcajes: periodo y empleado se validan
+  ---
+  duration_ms: 6.015311
+  type: 'test'
+  ...
+# Subtest: Corregir: modifica la incidencia de un marcaje de terminal reenviándolo con POST (misma hora y terminal)
+ok 51 - Corregir: modifica la incidencia de un marcaje de terminal reenviándolo con POST (misma hora y terminal)
+  ---
+  duration_ms: 6.759302
+  type: 'test'
+  ...
+# Subtest: Corregir: añade marcajes manuales con POST /Booking/attendance (Debug MAN)
+ok 52 - Corregir: añade marcajes manuales con POST /Booking/attendance (Debug MAN)
+  ---
+  duration_ms: 6.140224
+  type: 'test'
+  ...
+# Subtest: Eliminar: DELETE /Booking/attendance con id, fecha y hora; prueba formatos y comprueba que ya no está
+ok 53 - Eliminar: DELETE /Booking/attendance con id, fecha y hora; prueba formatos y comprueba que ya no está
+  ---
+  duration_ms: 19.360396
+  type: 'test'
+  ...
+# Subtest: Ausencia del día: PUT /Absence con desde = hasta = el día seleccionado
+ok 54 - Ausencia del día: PUT /Absence con desde = hasta = el día seleccionado
+  ---
+  duration_ms: 8.376616
+  type: 'test'
+  ...
+# Subtest: Quitar la ausencia del día: DELETE /Absence y comprobación; no toca ausencias de varios días
+ok 55 - Quitar la ausencia del día: DELETE /Absence y comprobación; no toca ausencias de varios días
+  ---
+  duration_ms: 26.503562
+  type: 'test'
+  ...
+# Subtest: Incidencias: salen de la tabla INCIDENC de la BD (sin conexión configurada → 409)
+ok 56 - Incidencias: salen de la tabla INCIDENC de la BD (sin conexión configurada → 409)
+  ---
+  duration_ms: 2.492506
+  type: 'test'
+  ...
+# Subtest: credenciales incorrectas: error claro
+ok 57 - credenciales incorrectas: error claro
+  ---
+  duration_ms: 6.1509
+  type: 'test'
+  ...
+# Subtest: URL API mal: 404 con pista
+ok 58 - URL API mal: 404 con pista
+  ---
+  duration_ms: 13.238454
+  type: 'test'
+  ...
+# Subtest: WSDL: espacio de nombres y parámetros en orden de cada operación
+ok 59 - WSDL: espacio de nombres y parámetros en orden de cada operación
+  ---
+  duration_ms: 2.517334
+  type: 'test'
+  ...
+# Subtest: cada parámetro recibe su valor por el nombre
+ok 60 - cada parámetro recibe su valor por el nombre
+  ---
+  duration_ms: 0.537605
+  type: 'test'
+  ...
+# Subtest: empresa de conexión: los dígitos tras suiteclient en la URL
+ok 61 - empresa de conexión: los dígitos tras suiteclient en la URL
+  ---
+  duration_ms: 0.290926
+  type: 'test'
+  ...
+# Subtest: resultado y fallo SOAP
+ok 62 - resultado y fallo SOAP
+  ---
+  duration_ms: 0.905227
+  type: 'test'
+  ...
+# Subtest: Asignar vacaciones del día: SOAP AsignarDiaVacaciones con los parámetros del WSDL
+ok 63 - Asignar vacaciones del día: SOAP AsignarDiaVacaciones con los parámetros del WSDL
+  ---
+  duration_ms: 51.249441
+  type: 'test'
+  ...
+# Subtest: Cambiar: primero BorrarVacaciones y luego AsignarDiaVacaciones; quitar: BorrarVacaciones
+ok 64 - Cambiar: primero BorrarVacaciones y luego AsignarDiaVacaciones; quitar: BorrarVacaciones
+  ---
+  duration_ms: 28.704066
+  type: 'test'
+  ...
+# Subtest: periodos en horas: AsignarHorasVacaciones con las horas HH:MM
+ok 65 - periodos en horas: AsignarHorasVacaciones con las horas HH:MM
+  ---
+  duration_ms: 7.910898
+  type: 'test'
+  ...
+# Subtest: si Evalos devuelve un mensaje en lugar de Ok, se muestra como error
+ok 66 - si Evalos devuelve un mensaje en lugar de Ok, se muestra como error
+  ---
+  duration_ms: 10.408872
+  type: 'test'
+  ...
+# Subtest: demo: adelantar la fecha de alta mueve vigencia, tarjeta y organización
+ok 67 - demo: adelantar la fecha de alta mueve vigencia, tarjeta y organización
+  ---
+  duration_ms: 73.396885
+  type: 'test'
+  ...
+# Subtest: demo: retrasar la fecha de alta con un cambio de departamento por medio → 409 y no cambia nada
+ok 68 - demo: retrasar la fecha de alta con un cambio de departamento por medio → 409 y no cambia nada
+  ---
+  duration_ms: 31.992034
+  type: 'test'
+  ...
+# Subtest: demo: adelantar la fecha de alta con la tarjeta en manos de otro empleado esos días → 409
+ok 69 - demo: adelantar la fecha de alta con la tarjeta en manos de otro empleado esos días → 409
+  ---
+  duration_ms: 21.188471
+  type: 'test'
+  ...
+# Subtest: demo: periodos del convenio tras corregir la fecha de alta
+ok 70 - demo: periodos del convenio tras corregir la fecha de alta
+  ---
+  duration_ms: 35.651194
+  type: 'test'
+  ...
+# Subtest: fechas y horas de Evalos
+ok 71 - fechas y horas de Evalos
+  ---
+  duration_ms: 1.956803
+  type: 'test'
+  ...
+# Subtest: rowsOf entiende las formas habituales de listado
+ok 72 - rowsOf entiende las formas habituales de listado
+  ---
+  duration_ms: 1.583814
+  type: 'test'
+  ...
+# Subtest: anomalías PS_ANOMA: el título de la columna, cuando vale 1 o no es cero
+ok 73 - anomalías PS_ANOMA: el título de la columna, cuando vale 1 o no es cero
+  ---
+  duration_ms: 0.842433
+  type: 'test'
+  ...
+# Subtest: el listado con columnas CAnnn y cabeceras se lee por la cabecera
+ok 74 - el listado con columnas CAnnn y cabeceras se lee por la cabecera
+  ---
+  duration_ms: 0.364296
+  type: 'test'
+  ...
+# Subtest: formato real de Report/filter: header + body con columns por Number
+ok 75 - formato real de Report/filter: header + body con columns por Number
+  ---
+  duration_ms: 0.504186
+  type: 'test'
+  ...
+# Subtest: payload de modificación: manual cambia la hora; terminal conserva hora y terminal
+ok 76 - payload de modificación: manual cambia la hora; terminal conserva hora y terminal
+  ---
+  duration_ms: 0.513199
+  type: 'test'
+  ...
+# Subtest: marcajes sin sentido E/S se alternan y se ordenan
+ok 77 - marcajes sin sentido E/S se alternan y se ordenan
+  ---
+  duration_ms: 9.348864
+  type: 'test'
+  ...
+# Subtest: todos los días del periodo aparecen, aunque no tengan marcajes ni anomalías
+ok 78 - todos los días del periodo aparecen, aunque no tengan marcajes ni anomalías
+  ---
+  duration_ms: 1.125858
+  type: 'test'
+  ...
+# Subtest: el día muestra una sola cosa: ausencia > vacaciones > turno, con descripción y color
+ok 79 - el día muestra una sola cosa: ausencia > vacaciones > turno, con descripción y color
+  ---
+  duration_ms: 0.878627
+  type: 'test'
+  ...
+# Subtest: solo personal que existe: código exacto o con/sin ceros a la izquierda
+ok 80 - solo personal que existe: código exacto o con/sin ceros a la izquierda
+  ---
+  duration_ms: 0.909924
+  type: 'test'
+  ...
+# Subtest: filtro del listado: empleado concreto o empresa/departamento/sección/área
+ok 81 - filtro del listado: empleado concreto o empresa/departamento/sección/área
+  ---
+  duration_ms: 0.534602
+  type: 'test'
+  ...
+# Subtest: discovery anuncia híbrido y response_modes
+ok 82 - discovery anuncia híbrido y response_modes
+  ---
+  duration_ms: 45.967739
+  type: 'test'
+  ...
+# Subtest: vector conocido de at_hash (OIDC Core A.3)
+ok 83 - vector conocido de at_hash (OIDC Core A.3)
+  ---
+  duration_ms: 0.278377
+  type: 'test'
+  ...
+# Subtest: flujo híbrido con form_post devuelve form auto-enviado con code, id_token, access_token
+ok 84 - flujo híbrido con form_post devuelve form auto-enviado con code, id_token, access_token
+  ---
+  duration_ms: 30.108201
+  type: 'test'
+  ...
+# Subtest: email siempre presente aunque solo se pida scope openid (Katana) y access_token válido en userinfo
+ok 85 - email siempre presente aunque solo se pida scope openid (Katana) y access_token válido en userinfo
+  ---
+  duration_ms: 17.860622
+  type: 'test'
+  ...
+# Subtest: nonce es obligatorio en el flujo híbrido
+ok 86 - nonce es obligatorio en el flujo híbrido
+  ---
+  duration_ms: 4.328598
+  type: 'test'
+  ...
+# Subtest: se rechaza el híbrido para un cliente no autorizado
+ok 87 - se rechaza el híbrido para un cliente no autorizado
+  ---
+  duration_ms: 4.553496
+  type: 'test'
+  ...
+# Subtest: el flujo code existente sigue funcionando (authorize + token)
+ok 88 - el flujo code existente sigue funcionando (authorize + token)
+  ---
+  duration_ms: 23.311788
+  type: 'test'
+  ...
+# Subtest: validación: normaliza código y nombre en mayúsculas
+ok 89 - validación: normaliza código y nombre en mayúsculas
+  ---
+  duration_ms: 5.941045
+  type: 'test'
+  ...
+# Subtest: validación: código, nombre, tarjeta y alta son obligatorios
+ok 90 - validación: código, nombre, tarjeta y alta son obligatorios
+  ---
+  duration_ms: 0.555783
+  type: 'test'
+  ...
+# Subtest: validación: fechas, email, longitudes y valores de los desplegables
+ok 91 - validación: fechas, email, longitudes y valores de los desplegables
+  ---
+  duration_ms: 0.625447
+  type: 'test'
+  ...
+# Subtest: validación: al modificar, el código lo fija la URL y la tarjeta no se pide
+ok 92 - validación: al modificar, el código lo fija la URL y la tarjeta no se pide
+  ---
+  duration_ms: 0.236274
+  type: 'test'
+  ...
+# Subtest: fecha y hora de los cambios en hora de Madrid
+ok 93 - fecha y hora de los cambios en hora de Madrid
+  ---
+  duration_ms: 24.3636
+  type: 'test'
+  ...
+# Subtest: demo: alta, modificación, tarjeta duplicada y eliminación
+ok 94 - demo: alta, modificación, tarjeta duplicada y eliminación
+  ---
+  duration_ms: 64.8824
+  type: 'test'
+  ...
+# Subtest: demo: asignar y desasignar tarjetas, varias por empleado y sin solapes
+ok 95 - demo: asignar y desasignar tarjetas, varias por empleado y sin solapes
+  ---
+  duration_ms: 36.962911
+  type: 'test'
+  ...
+# Subtest: demo: no deja eliminar a un empleado con marcajes
+ok 96 - demo: no deja eliminar a un empleado con marcajes
+  ---
+  duration_ms: 5.890038
+  type: 'test'
+  ...
+# Subtest: SQL Server: el alta escribe la ficha, los valores fijos y las fechas en aaaammdd
+ok 97 - SQL Server: el alta escribe la ficha, los valores fijos y las fechas en aaaammdd
+  ---
+  duration_ms: 3.812345
+  type: 'test'
+  ...
+# Subtest: SQL Server: el alta crea la tarjeta si no existe y su asignación en HIS_TARJETA
+ok 98 - SQL Server: el alta crea la tarjeta si no existe y su asignación en HIS_TARJETA
+  ---
+  duration_ms: 1.908821
+  type: 'test'
+  ...
+# Subtest: SQL Server: modificar no toca el código ni los valores fijos
+ok 99 - SQL Server: modificar no toca el código ni los valores fijos
+  ---
+  duration_ms: 0.991967
+  type: 'test'
+  ...
+# Subtest: SQL Server: tarjeta vigente en otro empleado → 409 y no se inserta nada
+ok 100 - SQL Server: tarjeta vigente en otro empleado → 409 y no se inserta nada
+  ---
+  duration_ms: 1.645797
+  type: 'test'
+  ...
+# Subtest: SQL Server: modificar no reescribe la tarjeta (EM_TARJ)
+ok 101 - SQL Server: modificar no reescribe la tarjeta (EM_TARJ)
+  ---
+  duration_ms: 0.613069
+  type: 'test'
+  ...
+# Subtest: SQL Server: asignar inserta tramo A y deja EM_TARJ con la vigente más reciente
+ok 102 - SQL Server: asignar inserta tramo A y deja EM_TARJ con la vigente más reciente
+  ---
+  duration_ms: 0.665027
+  type: 'test'
+  ...
+# Subtest: SQL Server: desasignar cierra el tramo con baja, tipo B, fecha, hora e iniciales
+ok 103 - SQL Server: desasignar cierra el tramo con baja, tipo B, fecha, hora e iniciales
+  ---
+  duration_ms: 0.80054
+  type: 'test'
+  ...
+# Subtest: SQL Server: historial de tarjetas, vigencia y registro
+ok 104 - SQL Server: historial de tarjetas, vigencia y registro
+  ---
+  duration_ms: 0.911767
+  type: 'test'
+  ...
+# Subtest: SQL Server: no elimina si el empleado tiene marcajes
+ok 105 - SQL Server: no elimina si el empleado tiene marcajes
+  ---
+  duration_ms: 0.879018
+  type: 'test'
+  ...
+# Subtest: SQL Server: elimina si no hay datos relacionados
+ok 106 - SQL Server: elimina si no hay datos relacionados
+  ---
+  duration_ms: 0.696664
+  type: 'test'
+  ...
+# Subtest: SQL Server: lectura convierte fechas aaaammdd y calcula activo
+ok 107 - SQL Server: lectura convierte fechas aaaammdd y calcula activo
+  ---
+  duration_ms: 0.369273
+  type: 'test'
+  ...
+# Subtest: códigos automáticos y día anterior
+ok 108 - códigos automáticos y día anterior
+  ---
+  duration_ms: 0.404136
+  type: 'test'
+  ...
+# Subtest: código de empleado: 10 dígitos solo números; tarjeta: 10 caracteres alfanuméricos en mayúsculas; ambos con ceros
+ok 109 - código de empleado: 10 dígitos solo números; tarjeta: 10 caracteres alfanuméricos en mayúsculas; ambos con ceros
+  ---
+  duration_ms: 0.477646
+  type: 'test'
+  ...
+# Subtest: validación: nombres escritos en el alta → código existente o nombre nuevo
+ok 110 - validación: nombres escritos en el alta → código existente o nombre nuevo
+  ---
+  duration_ms: 0.648552
+  type: 'test'
+  ...
+# Subtest: demo: alta con un departamento nuevo lo crea y abre su tramo
+ok 111 - demo: alta con un departamento nuevo lo crea y abre su tramo
+  ---
+  duration_ms: 24.925052
+  type: 'test'
+  ...
+# Subtest: demo: cambiar de departamento cierra el anterior el día antes; solo uno vigente
+ok 112 - demo: cambiar de departamento cierra el anterior el día antes; solo uno vigente
+  ---
+  duration_ms: 27.801658
+  type: 'test'
+  ...
+# Subtest: demo: varios empleados pueden compartir departamento (a diferencia de las tarjetas)
+ok 113 - demo: varios empleados pueden compartir departamento (a diferencia de las tarjetas)
+  ---
+  duration_ms: 9.437657
+  type: 'test'
+  ...
+# Subtest: SQL Server: cambiar de departamento cierra el abierto el día antes, abre el nuevo y actualiza EM_DEPA
+ok 114 - SQL Server: cambiar de departamento cierra el abierto el día antes, abre el nuevo y actualiza EM_DEPA
+  ---
+  duration_ms: 0.886119
+  type: 'test'
+  ...
+# Subtest: SQL Server: no deja abrir un tramo anterior o igual al vigente
+ok 115 - SQL Server: no deja abrir un tramo anterior o igual al vigente
+  ---
+  duration_ms: 0.524987
+  type: 'test'
+  ...
+# Subtest: SQL Server: un departamento nuevo se crea con el siguiente código libre
+ok 116 - SQL Server: un departamento nuevo se crea con el siguiente código libre
+  ---
+  duration_ms: 0.923023
+  type: 'test'
+  ...
+# Subtest: SQL Server: modificar la ficha no toca tarjeta ni organización
+ok 117 - SQL Server: modificar la ficha no toca tarjeta ni organización
+  ---
+  duration_ms: 0.469775
+  type: 'test'
+  ...
+# Subtest: SQL Server: eliminar borra también sus históricos de organización
+ok 118 - SQL Server: eliminar borra también sus históricos de organización
+  ---
+  duration_ms: 0.348623
+  type: 'test'
+  ...
+# Subtest: demo: al dar de baja al empleado se cierran todos sus tramos con la fecha de baja
+ok 119 - demo: al dar de baja al empleado se cierran todos sus tramos con la fecha de baja
+  ---
+  duration_ms: 22.923276
+  type: 'test'
+  ...
+# Subtest: demo: no deja dar de baja antes de un tramo que empieza después
+ok 120 - demo: no deja dar de baja antes de un tramo que empieza después
+  ---
+  duration_ms: 7.952315
+  type: 'test'
+  ...
+# Subtest: demo: alta con fecha de baja deja sus tramos cerrados
+ok 121 - demo: alta con fecha de baja deja sus tramos cerrados
+  ---
+  duration_ms: 6.39105
+  type: 'test'
+  ...
+# Subtest: SQL Server: la baja cierra los tramos abiertos de todos los históricos en la misma transacción
+ok 122 - SQL Server: la baja cierra los tramos abiertos de todos los históricos en la misma transacción
+  ---
+  duration_ms: 1.131746
+  type: 'test'
+  ...
+# Subtest: SQL Server: la baja se rechaza si hay tramos que empiezan después
+ok 123 - SQL Server: la baja se rechaza si hay tramos que empiezan después
+  ---
+  duration_ms: 0.605127
+  type: 'test'
+  ...
+# Subtest: reglas: la baja de un empleado de baja solo se puede adelantar; readmisión posterior a la baja
+ok 124 - reglas: la baja de un empleado de baja solo se puede adelantar; readmisión posterior a la baja
+  ---
+  duration_ms: 0.630765
+  type: 'test'
+  ...
+# Subtest: demo: alta, baja y readmisión con formulario vacío
+ok 125 - demo: alta, baja y readmisión con formulario vacío
+  ---
+  duration_ms: 45.385737
+  type: 'test'
+  ...
+# Subtest: SQL Server: el alta abre el periodo en HIS_VIGENCIA
+ok 126 - SQL Server: el alta abre el periodo en HIS_VIGENCIA
+  ---
+  duration_ms: 0.728923
+  type: 'test'
+  ...
+# Subtest: SQL Server: readmitir abre periodo y tramos nuevos, deja EM_FBAJ vacía y en una transacción
+ok 127 - SQL Server: readmitir abre periodo y tramos nuevos, deja EM_FBAJ vacía y en una transacción
+  ---
+  duration_ms: 1.210645
+  type: 'test'
+  ...
+# Subtest: SQL Server: readmitir rechaza a un empleado activo o una fecha no posterior a la baja
+ok 128 - SQL Server: readmitir rechaza a un empleado activo o una fecha no posterior a la baja
+  ---
+  duration_ms: 0.879499
+  type: 'test'
+  ...
+# Subtest: validación: consultas y solicitudes solo admiten valores existentes de KIOSKO y WORKFLOW
+ok 129 - validación: consultas y solicitudes solo admiten valores existentes de KIOSKO y WORKFLOW
+  ---
+  duration_ms: 0.361442
+  type: 'test'
+  ...
+# Subtest: usuarios: alta como empleado vinculado y sincronización de nombre y email
+ok 130 - usuarios: alta como empleado vinculado y sincronización de nombre y email
+  ---
+  duration_ms: 84.47199
+  type: 'test'
+  ...
+# Subtest: usuarios: sin conexión con Evalos el formulario no ofrece el alta como empleado
+ok 131 - usuarios: sin conexión con Evalos el formulario no ofrece el alta como empleado
+  ---
+  duration_ms: 0.8736
+  type: 'test'
+  ...
+# Subtest: usuarios: solo los roles distintos de «Usuario» tienen acceso a Evalos (USUARIOS)
+ok 132 - usuarios: solo los roles distintos de «Usuario» tienen acceso a Evalos (USUARIOS)
+  ---
+  duration_ms: 5.855136
+  type: 'test'
+  ...
+# Subtest: SQL Server: incidencias de INCIDENC (código y descripción) para Correcciones
+ok 133 - SQL Server: incidencias de INCIDENC (código y descripción) para Correcciones
+  ---
+  duration_ms: 0.71426
+  type: 'test'
+  ...
+# Subtest: SQL Server: incidencias de tipo A (IN_TIPO) para las ausencias
+ok 134 - SQL Server: incidencias de tipo A (IN_TIPO) para las ausencias
+  ---
+  duration_ms: 0.278718
+  type: 'test'
+  ...
+# Subtest: colores de Evalos a \#rrggbb
+ok 135 - colores de Evalos a \#rrggbb
+  ---
+  duration_ms: 0.688802
+  type: 'test'
+  ...
+# Subtest: SQL Server: descripciones y colores de turnos, vacaciones e incidencias
+ok 136 - SQL Server: descripciones y colores de turnos, vacaciones e incidencias
+  ---
+  duration_ms: 0.949754
+  type: 'test'
+  ...
+# Subtest: SQL Server: alta de tipo de vacaciones con las opciones que marca Evalos
+ok 137 - SQL Server: alta de tipo de vacaciones con las opciones que marca Evalos
+  ---
+  duration_ms: 1.466599
+  type: 'test'
+  ...
+# Subtest: ficha: el convenio solo admite convenios existentes y se guarda en EM_CONV
+ok 138 - ficha: el convenio solo admite convenios existentes y se guarda en EM_CONV
+  ---
+  duration_ms: 1.145617
+  type: 'test'
+  ...
+# Subtest: SQL Server: asignar y quitar el convenio a varios empleados (EM_CONV)
+ok 139 - SQL Server: asignar y quitar el convenio a varios empleados (EM_CONV)
+  ---
+  duration_ms: 0.911786
+  type: 'test'
+  ...
+# Subtest: SQL Server: al guardar un convenio se escriben sus periodos, límites y pluses
+ok 140 - SQL Server: al guardar un convenio se escriben sus periodos, límites y pluses
+  ---
+  duration_ms: 1.372307
+  type: 'test'
+  ...
+# Subtest: SQL Server: periodos de VACACIONES (alta con valores fijos; actualización sin tocar lo asignado)
+ok 141 - SQL Server: periodos de VACACIONES (alta con valores fijos; actualización sin tocar lo asignado)
+  ---
+  duration_ms: 3.664483
+  type: 'test'
+  ...
+# Subtest: SQL Server: periodos de INCIDENCIALIMITE (límite en minutos y PERIODOENDIAS 0 si es en horas)
+ok 142 - SQL Server: periodos de INCIDENCIALIMITE (límite en minutos y PERIODOENDIAS 0 si es en horas)
+  ---
+  duration_ms: 0.702563
+  type: 'test'
+  ...
+# Subtest: SQL Server: los límites guardados en días se leen en horas (8 h por día) y se guardan en minutos
+ok 143 - SQL Server: los límites guardados en días se leen en horas (8 h por día) y se guardan en minutos
+  ---
+  duration_ms: 1.500188
+  type: 'test'
+  ...
+# Subtest: rol de Workflow en la ficha
+ok 144 - rol de Workflow en la ficha
+  ---
+  duration_ms: 0.349084
+  type: 'test'
+  ...
+# Subtest: SQL Server: corregir la fecha de alta mueve los tramos que empezaban en la antigua (en la misma transacción)
+ok 145 - SQL Server: corregir la fecha de alta mueve los tramos que empezaban en la antigua (en la misma transacción)
+  ---
+  duration_ms: 1.136243
+  type: 'test'
+  ...
+# Subtest: SQL Server: corregir la fecha de alta con un tramo que acaba antes de la nueva → 409
+ok 146 - SQL Server: corregir la fecha de alta con un tramo que acaba antes de la nueva → 409
+  ---
+  duration_ms: 0.706529
+  type: 'test'
+  ...
+# Subtest: PRIME_STORE=sqlite pasa a usar SQL Server
+ok 147 - PRIME_STORE=sqlite pasa a usar SQL Server
+  ---
+  duration_ms: 1.376182
+  type: 'test'
+  ...
+# Subtest: claves: se respetan las cortas y las largas se resumen de forma estable
+ok 148 - claves: se respetan las cortas y las largas se resumen de forma estable
+  ---
+  duration_ms: 0.371327
+  type: 'test'
+  ...
+# Subtest: prefijos LIKE: se escapan los comodines de SQL Server
+ok 149 - prefijos LIKE: se escapan los comodines de SQL Server
+  ---
+  duration_ms: 0.237996
+  type: 'test'
+  ...
+# Subtest: la contraseña se cifra y descifra (clave local si no hay PRIME_SECRET_KEY)
+ok 150 - la contraseña se cifra y descifra (clave local si no hay PRIME_SECRET_KEY)
+  ---
+  duration_ms: 1.811836
+  type: 'test'
+  ...
+# Subtest: validación del formulario
+ok 151 - validación del formulario
+  ---
+  duration_ms: 1.44776
+  type: 'test'
+  ...
+# Subtest: código de configuración: formato, comprobación y bloqueo
+ok 152 - código de configuración: formato, comprobación y bloqueo
+  ---
+  duration_ms: 0.829594
+  type: 'test'
+  ...
+# Subtest: sin fichero de conexión queda en modo configuración y responde 503 DB_SETUP
+ok 153 - sin fichero de conexión queda en modo configuración y responde 503 DB_SETUP
+  ---
+  duration_ms: 1.096324
+  type: 'test'
+  ...
+# Subtest: fichero de conexión inválido: también modo configuración
+ok 154 - fichero de conexión inválido: también modo configuración
+  ---
+  duration_ms: 0.338247
+  type: 'test'
+  ...
+# Subtest: el esquema es idempotente y usa intercalación binaria en la clave
+ok 155 - el esquema es idempotente y usa intercalación binaria en la clave
+  ---
+  duration_ms: 0.517055
+  type: 'test'
+  ...
+# Subtest: no se admiten bases de datos del sistema
+ok 156 - no se admiten bases de datos del sistema
+  ---
+  duration_ms: 0.66752
+  type: 'test'
+  ...
+# Subtest: cada instalación tiene un id estable y un nombre de BD sugerido distinto en producción
+ok 157 - cada instalación tiene un id estable y un nombre de BD sugerido distinto en producción
+  ---
+  duration_ms: 0.827811
+  type: 'test'
+  ...
+# Subtest: login correcto: pasos con el usuario identificado y los datos enviados, sin tokens ni secretos
+ok 158 - login correcto: pasos con el usuario identificado y los datos enviados, sin tokens ni secretos
+  ---
+  duration_ms: 58.099723
+  type: 'test'
+  ...
+# Subtest: cliente público sin PKCE: el log explica el error y cómo arreglarlo
+ok 159 - cliente público sin PKCE: el log explica el error y cómo arreglarlo
+  ---
+  duration_ms: 7.19148
+  type: 'test'
+  ...
+# Subtest: redirect_uri distinta: se apunta la recibida y las configuradas
+ok 160 - redirect_uri distinta: se apunta la recibida y las configuradas
+  ---
+  duration_ms: 8.005085
+  type: 'test'
+  ...
+# Subtest: secreto incorrecto al canjear: invalid_client en el log
+ok 161 - secreto incorrecto al canjear: invalid_client en el log
+  ---
+  duration_ms: 33.138808
+  type: 'test'
+  ...
+# Subtest: sin sesión: se apunta como anónimo y se ve solo desde que se abrió la app
+ok 162 - sin sesión: se apunta como anónimo y se ve solo desde que se abrió la app
+  ---
+  duration_ms: 10.237711
+  type: 'test'
+  ...
+# Subtest: con la casilla desactivada no se apunta nada
+ok 163 - con la casilla desactivada no se apunta nada
+  ---
+  duration_ms: 16.295821
+  type: 'test'
+  ...
+# Subtest: cada usuario ve solo sus pasos; el superadministrador ve todos
+ok 164 - cada usuario ve solo sus pasos; el superadministrador ve todos
+  ---
+  duration_ms: 34.555618
+  type: 'test'
+  ...
+# Subtest: Prime Token: el lanzamiento apunta el token emitido y el lanzamiento avisa al portal
+ok 165 - Prime Token: el lanzamiento apunta el token emitido y el lanzamiento avisa al portal
+  ---
+  duration_ms: 9.484763
+  type: 'test'
+  ...
+# Subtest: los datos sensibles se ocultan aunque lleguen en el paso
+ok 166 - los datos sensibles se ocultan aunque lleguen en el paso
+  ---
+  duration_ms: 1.886683
+  type: 'test'
+  ...
+# Subtest: el resumen del widget dice quién está en oficina, teletrabajo o ausente cada día
+ok 167 - el resumen del widget dice quién está en oficina, teletrabajo o ausente cada día
+  ---
+  duration_ms: 124.583746
+  type: 'test'
+  ...
+# Subtest: días de la semana y periodos
+ok 168 - días de la semana y periodos
+  ---
+  duration_ms: 3.602269
+  type: 'test'
+  ...
+# Subtest: bolsa semanal: consumido, planificado y exceso
+ok 169 - bolsa semanal: consumido, planificado y exceso
+  ---
+  duration_ms: 0.917435
+  type: 'test'
+  ...
+# Subtest: bolsa mensual prorrateada por alta a mitad de mes
+ok 170 - bolsa mensual prorrateada por alta a mitad de mes
+  ---
+  duration_ms: 0.691407
+  type: 'test'
+  ...
+# Subtest: bolsa en horas con días mixtos y arrastre
+ok 171 - bolsa en horas con días mixtos y arrastre
+  ---
+  duration_ms: 0.717705
+  type: 'test'
+  ...
+# Subtest: teletrabajo completo no tiene límite y presencial tiene cupo 0
+ok 172 - teletrabajo completo no tiene límite y presencial tiene cupo 0
+  ---
+  duration_ms: 0.767641
+  type: 'test'
+  ...
+# Subtest: Ley 10/2021: aviso si ≥30 % en 3 meses sin acuerdo
+ok 173 - Ley 10/2021: aviso si ≥30 % en 3 meses sin acuerdo
+  ---
+  duration_ms: 3.396561
+  type: 'test'
+  ...
+# Subtest: aforo, ausencias, festivos y mínimo presencial
+ok 174 - aforo, ausencias, festivos y mínimo presencial
+  ---
+  duration_ms: 2.562992
+  type: 'test'
+  ...
+# Subtest: patrón desde la política: respeta lo ya planificado salvo que se sobrescriba
+ok 175 - patrón desde la política: respeta lo ya planificado salvo que se sobrescriba
+  ---
+  duration_ms: 0.569624
+  type: 'test'
+  ...
+# Subtest: informe anual y compensación
+ok 176 - informe anual y compensación
+  ---
+  duration_ms: 4.64338
+  type: 'test'
+  ...
+# Subtest: comprobar cambios: avisa al superar la bolsa y el mínimo presencial, no si mejora
+ok 177 - comprobar cambios: avisa al superar la bolsa y el mínimo presencial, no si mejora
+  ---
+  duration_ms: 1.829403
+  type: 'test'
+  ...
+# Subtest: comprobar cambios: aforo
+ok 178 - comprobar cambios: aforo
+  ---
+  duration_ms: 0.538848
+  type: 'test'
+  ...
+# Subtest: el responsable valida su departamento y los añadidos; ve a su gente
+ok 179 - el responsable valida su departamento y los añadidos; ve a su gente
+  ---
+  duration_ms: 9.472729
+  type: 'test'
+  ...
+# Subtest: el validador asignado a mano sustituye al de su departamento
+ok 180 - el validador asignado a mano sustituye al de su departamento
+  ---
+  duration_ms: 1.158647
+  type: 'test'
+  ...
+# Subtest: al recalcular conserva los perfiles y lo editado; un nuevo responsable solo cambia el nivel 1
+ok 181 - al recalcular conserva los perfiles y lo editado; un nuevo responsable solo cambia el nivel 1
+  ---
+  duration_ms: 1.440078
+  type: 'test'
+  ...
+# Subtest: validación manual, filtros y script
+ok 182 - validación manual, filtros y script
+  ---
+  duration_ms: 0.843325
+  type: 'test'
+  ...
+# Subtest: quita los perfiles de la versión por equipos: a quien no tiene rol y, sin nadie, se borran
+ok 183 - quita los perfiles de la versión por equipos: a quien no tiene rol y, sin nadie, se borran
+  ---
+  duration_ms: 0.46035
+  type: 'test'
+  ...
+# Subtest: códigos, orden de validación y cambios del perfil desde la pantalla
+ok 184 - códigos, orden de validación y cambios del perfil desde la pantalla
+  ---
+  duration_ms: 0.86769
+  type: 'test'
+  ...
+# Subtest: rol en EM_WORKFLOWROL: completo si cabe, abreviado si la columna es corta, y se lee de las dos formas
+ok 185 - rol en EM_WORKFLOWROL: completo si cabe, abreviado si la columna es corta, y se lee de las dos formas
+  ---
+  duration_ms: 0.370044
+  type: 'test'
+  ...
+# Subtest: demostración: perfiles por departamento, validador a mano, lo editado se conserva y lo que queda sin nadie se borra
+ok 186 - demostración: perfiles por departamento, validador a mano, lo editado se conserva y lo que queda sin nadie se borra
+  ---
+  duration_ms: 63.351361
+  type: 'test'
+  ...
+# Subtest: SQL Server: aplica el plan en WORKFLOW, PS_WF2PERFILES y EM_WFOP, y solo borra perfiles de Prime Suite sin nadie
+ok 187 - SQL Server: aplica el plan en WORKFLOW, PS_WF2PERFILES y EM_WFOP, y solo borra perfiles de Prime Suite sin nadie
+  ---
+  duration_ms: 3.169111
+  type: 'test'
+  ...
+# Subtest: SQL Server: rol abreviado con EM_WORKFLOWROL de 5 caracteres
+ok 188 - SQL Server: rol abreviado con EM_WORKFLOWROL de 5 caracteres
+  ---
+  duration_ms: 0.463615
+  type: 'test'
+  ...
+# Subtest: SQL Server: si faltan tablas o columnas las crea y sigue; si no puede, explica el permiso
+ok 189 - SQL Server: si faltan tablas o columnas las crea y sigue; si no puede, explica el permiso
+  ---
+  duration_ms: 1.004585
+  type: 'test'
+  ...
+# Subtest: Seguridad y perfiles (Perfiles Workflow) solo aparece a los administradores
+ok 190 - Seguridad y perfiles (Perfiles Workflow) solo aparece a los administradores
+  ---
+  duration_ms: 0.434852
+  type: 'test'
+  ...
+1..190
+# tests 190
+# suites 0
+# pass 190
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3662.612181
+exit=0
