@@ -693,6 +693,17 @@ pre.code.evcall-pre { max-height: 320px; overflow: auto; white-space: pre-wrap; 
 .tw-bar { height: 64px; width: 28px; display: flex; flex-direction: column-reverse; border-radius: 8px; overflow: hidden; background: rgba(36,58,77,.06); }
 .tw-bar .o { background: #31506A; }
 .tw-bar .t { background: #0E9F7E; }
+.tw-wday { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; border: 1px solid transparent; border-radius: 10px; background: none; color: var(--muted); cursor: pointer; font: inherit; }
+.tw-wday:hover:not(:disabled) { background: var(--surface-2); }
+.tw-wday.on { border-color: var(--line); background: var(--surface-2); color: var(--ink); font-weight: 700; }
+.tw-wday:disabled { cursor: default; }
+.tw-who { display: flex; flex-direction: column; gap: 5px; }
+.tw-who-h { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.tw-who-h b { color: var(--ink); }
+.tw-who-list { display: flex; flex-wrap: wrap; gap: 5px; }
+.tw-who-chip { display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 999px; background: var(--surface-2); border: 1px solid transparent; color: var(--ink); font-size: 12.5px; text-decoration: none; font-family: inherit; cursor: pointer; transition: border-color .15s, background .15s; }
+.tw-who-chip:hover { border-color: var(--line); background: #fff; }
+.tw-who-chip.more { color: var(--muted); font-weight: 600; }
 .tw-name-btn { border: 0; background: none; padding: 0; text-align: left; cursor: pointer; color: var(--ink); min-width: 0; }
 .tw-name-btn b { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tw-name-btn:hover b { color: var(--brand-ink); }

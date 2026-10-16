@@ -317,7 +317,7 @@ export function teletrabajoRoutes(r: Router) {
 
   // Resumen de hoy para el widget del Inicio.
   r.get('/api/evalos/teletrabajo/hoy', async (req) => {
-    const { c } = await requireEvalos(req);
+    const { c, canEdit } = await requireEvalos(req);
     const today = todayIso();
     const cfg = await tw.getConfig(c.company.id);
     const { from, to } = rangeForMonth(today.slice(0, 7), cfg.settings.carryOver);
@@ -326,17 +326,39 @@ export function teletrabajoRoutes(r: Router) {
     const v = tw.monthView(L.ctx, emps, today.slice(0, 7));
     const occ = v.occupancy[today];
     const workday = tw.isWorkday(L.ctx, today);
-    // Próximos 5 laborables
-    const next: { date: string; office: number; remote: number }[] = [];
-    for (let d = today, guard = 0; next.length < 5 && guard < 20; d = tw.addDays(d, 1), guard++) {
+    // Hoy (si es laborable) y los siguientes laborables hasta 5, aunque crucen de mes:
+    // para cada día, quién está en la oficina, en teletrabajo, mixto o ausente.
+    const all = withContract(L.employees, today, tw.addDays(today, 14));
+    type Who = 'O' | 'T' | 'H' | 'A';
+    const days: { date: string; office: number; remote: number; absent: number; who: Record<string, Who>; hours: Record<string, number> }[] = [];
+    for (let d = today, guard = 0; days.length < 5 && guard < 20 && d <= to; d = tw.addDays(d, 1), guard++) {
       if (!tw.isWorkday(L.ctx, d)) continue;
-      const o = v.occupancy[d];
-      if (o) next.push({ date: d, office: o.office, remote: o.remote });
+      const day = { date: d, office: 0, remote: 0, absent: 0, who: {} as Record<string, Who>, hours: {} as Record<string, number> };
+      for (const e of all) {
+        const ef = tw.effectiveDay(L.ctx, e, d);
+        if (ef.k === 'A') { day.who[e.code] = 'A'; day.absent++; }
+        else if (ef.k === 'T') { day.who[e.code] = 'T'; day.remote++; }
+        else if (ef.k === 'O' || ef.k === 'H') {
+          day.who[e.code] = ef.k; day.office++;
+          if (ef.k === 'H') day.hours[e.code] = ef.h;
+        }
+      }
+      days.push(day);
     }
+    const nameOf = new Map(all.map((e) => [e.code, e.name]));
+    const deptName = new Map(L.departments.map((x) => [x.code, x.description || x.code]));
+    // Avisos más graves primero, con el nombre del empleado para poder abrirlo.
+    const rank = { bad: 0, warn: 1, info: 2 } as const;
+    const topAlerts = [...v.alerts].sort((a, b) => rank[a.level] - rank[b.level]).slice(0, 4)
+      .map((a) => ({ level: a.level, employee: a.employee, name: a.employee ? nameOf.get(a.employee) || a.employee : undefined, date: a.date, text: a.text }));
     return json({
       today, workday, office: occ?.office || 0, remote: occ?.remote || 0, absent: occ?.absent || 0,
       capacity: L.config.settings.officeCapacity, employees: emps.length,
-      alerts: v.alerts.length, exceeded: v.rows.filter((r) => r.balance.exceeded).length, next
+      alerts: v.alerts.length, exceeded: v.rows.filter((r) => r.balance.exceeded).length,
+      next: days.map((d) => ({ date: d.date, office: d.office, remote: d.remote })),
+      days,
+      people: all.map((e) => ({ code: e.code, name: e.name, department: deptName.get(e.department) || e.department || '' })),
+      topAlerts, canEdit
     });
   });
 }
